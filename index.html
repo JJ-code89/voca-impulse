@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="description" content="TOEFL과 DET 어휘를 간편하게 복습하는 한국어 단어장">
+  <title>Voca Impulse | 오늘의 영어 단어</title>
+  <!-- 한글 설명 주석: 홈 화면 설치 때 이름, 색상, 화면 표시 방식은 manifest.json 설정을 사용해요. -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* 한국어 설명: 색상과 글꼴 같은 공통 디자인 값을 변수로 관리해 한 곳에서 바꿀 수 있어요. */
+    :root {
+      color-scheme: light;
+      font-family: Inter, Pretendard, "Noto Sans KR", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #1e293b;
+      background: #f5f7fb;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+      --brand: #5b5ce2;
+      --brand-dark: #4748c7;
+      --muted: #68758a;
+      --line: #e7eaf1;
+      --surface: #ffffff;
+    }
+
+    /* 한국어 설명: 요소 크기 계산을 통일하고 기본 배경/버튼 동작을 정리해요. */
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at 80% 0%, #eeeefe 0, transparent 28rem), #f5f7fb;
+    }
+
+    button, select, input { font: inherit; }
+    button { cursor: pointer; }
+
+    .shell { width: min(100% - 36px, 1040px); margin: 0 auto; padding: 30px 0 56px; }
+    /* 한국어 설명: 상단 브랜드와 날짜를 한 줄에 나란히 배치해요. */
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 30px; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      display: grid;
+      width: 44px;
+      height: 44px;
+      place-items: center;
+      border-radius: 14px;
+      color: #fff;
+      background: var(--brand);
+      font-size: 20px;
+      font-weight: 800;
+      box-shadow: 0 8px 18px #5b5ce233;
+    }
+    .brand-name { margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -.04em; }
+    .brand-note { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+    .date-label { color: var(--muted); font-size: 13px; }
+    /* 한국어 설명: 로그인된 학습자 이름, 응원 문구와 프로필 전환 버튼을 헤더 오른쪽에 모아요. */
+    .header-user { display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
+    .greeting { margin: 0; font-size: 14px; font-weight: 750; text-align: right; }
+    .greeting-note { margin: 4px 0 0; color: var(--muted); font-size: 11px; text-align: right; }
+    .profile-switch-button { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; color: #475569; background: #fff; font-size: 12px; font-weight: 700; }
+    .profile-switch-button:hover { border-color: #aaaaff; background: #f7f7ff; }
+    /* 한국어 설명: 소리 설정을 헤더에 작게 두어 어느 화면에서나 쉽게 켜고 끌 수 있어요. */
+    .sound-toggle-button { min-height: 36px; padding: 0 11px; border: 1px solid var(--line); border-radius: 10px; color: #475569; background: #fff; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .sound-toggle-button:hover { border-color: #aaaaff; background: #f7f7ff; }
+    .sound-toggle-button[aria-pressed="true"] { border-color: #d8d9ff; color: var(--brand-dark); background: #f4f4ff; }
+    .sound-toggle-button:focus-visible { outline: 3px solid #a5a6ff; outline-offset: 2px; }
+    /* 한국어 설명: 헤더 덱 버튼은 현재 선택만 간결하게 보여줘요. */
+    .deck-trigger-button { min-height: 36px; max-width: 220px; overflow: hidden; padding: 0 11px; border: 1px solid var(--line); border-radius: 10px; color: #475569; background: #fff; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+    .deck-trigger-button:hover:not(:disabled) { border-color: #aaaaff; background: #f7f7ff; }
+    .deck-trigger-button:disabled { cursor: not-allowed; opacity: .55; }
+    .deck-trigger-button:focus-visible, .deck-drawer-close:focus-visible, .deck-option:focus-visible { outline: 3px solid #a5a6ff; outline-offset: 2px; }
+    /* 한국어 설명: 오버레이는 닫힐 때 투명해지고 visibility 지연으로 패널의 슬라이드 전환을 마무리해요. */
+    .deck-drawer-overlay { position: fixed; z-index: 20; inset: 0; visibility: hidden; opacity: 0; transition: opacity .28s ease, visibility 0s linear .28s; }
+    .deck-drawer-overlay.is-open { visibility: visible; opacity: 1; transition-delay: 0s; }
+    .deck-drawer-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #17203380; opacity: 0; transition: opacity .28s ease; }
+    .deck-drawer-overlay.is-open .deck-drawer-backdrop { opacity: 1; }
+    /* 한국어 설명: 패널은 왼쪽 바깥에서 시작해 열릴 때 화면 안쪽으로 부드럽게 이동해요. */
+    .deck-drawer-panel { position: absolute; inset: 0 auto 0 0; display: flex; width: min(100%, 390px); flex-direction: column; padding: 26px; background: #fff; box-shadow: 18px 0 50px #10182826; transform: translateX(-102%); transition: transform .28s ease; }
+    .deck-drawer-overlay.is-open .deck-drawer-panel { transform: translateX(0); }
+    .deck-drawer-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+    .deck-drawer-title { margin: 0; font-size: 21px; letter-spacing: -.04em; }
+    .deck-drawer-subtitle { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+    .deck-drawer-close { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; border: 1px solid var(--line); border-radius: 11px; color: #475569; background: #fff; font-size: 20px; }
+    .deck-drawer-close:hover { border-color: #aaaaff; background: #f7f7ff; }
+    .deck-options { display: grid; gap: 10px; overflow-y: auto; padding: 2px; }
+    .deck-option { display: flex; min-height: 68px; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 13px; color: #334155; background: #fff; text-align: left; transition: border-color .16s ease, background .16s ease, transform .16s ease; }
+    .deck-option:hover { transform: translateY(-1px); border-color: #aaaaff; background: #fafaff; }
+    .deck-option[aria-current="true"] { border-color: var(--brand); background: #f5f5ff; box-shadow: 0 0 0 2px #5b5ce21a; }
+    .deck-option-name { font-size: 14px; font-weight: 750; }
+    .deck-option-badge { flex: 0 0 auto; padding: 5px 8px; border-radius: 999px; color: #5b5ce2; background: #eeeefe; font-size: 10px; font-weight: 750; white-space: nowrap; }
+
+    /* 한국어 설명: 처음 방문과 프로필 전환 시 배경을 덮는 학습자 선택 창이에요. */
+    .profile-overlay { position: fixed; z-index: 10; inset: 0; display: grid; place-items: center; overflow-y: auto; padding: 20px; background: #17203399; }
+    .profile-overlay[hidden] { display: none; }
+    .profile-dialog { width: min(100%, 460px); max-height: calc(100vh - 40px); overflow-y: auto; padding: clamp(22px, 5vw, 34px); border: 1px solid var(--line); border-radius: 22px; background: #fff; box-shadow: 0 24px 70px #10182840; }
+    .profile-dialog h2 { margin: 0; font-size: 25px; letter-spacing: -.04em; }
+    .profile-dialog-copy { margin: 9px 0 22px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+    .profile-list { display: grid; gap: 9px; margin: 0 0 20px; }
+    .profile-option-row { display: flex; align-items: center; gap: 8px; }
+    .profile-option { display: flex; min-height: 48px; min-width: 0; flex: 1; align-items: center; justify-content: space-between; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; color: #263247; background: #fbfcff; font-weight: 700; text-align: left; }
+    .profile-option:hover { border-color: #aaaaff; background: #f7f7ff; }
+    .profile-delete-button { display: grid; width: 40px; height: 40px; flex: 0 0 40px; place-items: center; border: 1px solid #f1dada; border-radius: 11px; color: #9f4040; background: #fffafa; font-size: 12px; font-weight: 750; transition: border-color .16s ease, color .16s ease, background .16s ease, transform .16s ease; }
+    .profile-delete-button:hover { transform: translateY(-1px); border-color: #efb4b4; color: #b42318; background: #fff1f0; }
+    .profile-delete-button:focus-visible { outline: 3px solid #f2b8b5; outline-offset: 2px; }
+    .profile-empty { margin: 0 0 20px; padding: 13px; border-radius: 11px; color: var(--muted); background: #f5f7fb; font-size: 13px; }
+    .profile-form { display: grid; gap: 10px; }
+    .profile-form label { font-size: 13px; font-weight: 700; }
+    .profile-input { width: 100%; min-height: 46px; padding: 0 13px; border: 1px solid var(--line); border-radius: 11px; }
+    .profile-error { min-height: 18px; margin: 0; color: #a43333; font-size: 12px; }
+    .profile-dialog-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 12px; }
+
+    .intro { margin: 0 0 22px; }
+    .eyebrow { margin: 0 0 8px; color: var(--brand); font-size: 12px; font-weight: 800; letter-spacing: .1em; }
+    h1 { margin: 0; font-size: clamp(26px, 4vw, 36px); letter-spacing: -.05em; }
+    .intro-copy { margin: 9px 0 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
+
+    /* 한국어 설명: 네 개의 통계 카드를 데스크톱에서 같은 너비로 배치해요. */
+    .dashboard { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+    .stat-card, .panel { border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: 0 6px 24px #22304a08; }
+    .stat-card { display: flex; align-items: center; gap: 14px; min-height: 100px; padding: 18px; }
+    .stat-icon { display: grid; width: 44px; height: 44px; flex: 0 0 44px; place-items: center; border-radius: 14px; background: #f0f0ff; font-size: 20px; }
+    .stat-value { margin: 0; font-size: 25px; font-weight: 800; letter-spacing: -.04em; }
+    .stat-label { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+
+    /* 한국어 설명: 오답 복습, 오늘 단어 다시보기, 추가 단어 학습으로 바로 이동하는 버튼이에요. */
+    .dashboard-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-bottom: 22px; }
+    .dashboard-actions .button { min-height: 40px; padding: 0 14px; font-size: 13px; }
+    /* 한국어 설명: 실력 진단은 대시보드에서 바로 찾도록 강조하되 나머지 복습 버튼과 잘 어울리게 배치해요. */
+    .dashboard-actions .level-test-entry { margin-right: auto; color: #fff; background: #e97842; }
+    .dashboard-actions .level-test-entry:hover { background: #d96330; box-shadow: 0 8px 18px #e9784233; }
+    /* 한국어 설명: 진단 문항과 결과를 기존 카드 디자인 안에서 집중해서 볼 수 있게 구성해요. */
+    .level-test-card { padding: clamp(22px, 5vw, 36px); border: 1px solid var(--line); border-radius: 18px; background: linear-gradient(145deg, #fff, #fafaff); text-align: center; }
+    .level-test-card h2 { margin: 0; font-size: clamp(23px, 4vw, 30px); letter-spacing: -.04em; }
+    .level-test-card > p { color: var(--muted); font-size: 14px; line-height: 1.7; }
+    .level-test-word { margin: 22px 0 8px; color: #202b40; font-size: clamp(34px, 8vw, 52px); font-weight: 850; letter-spacing: -.05em; }
+    .level-test-prompt { margin: 0; color: var(--muted); font-size: 14px; }
+    .level-test-choices { display: grid; gap: 10px; margin-top: 24px; text-align: left; }
+    .level-test-choice { min-height: 54px; padding: 13px 16px; border: 1px solid var(--line); border-radius: 12px; color: #334155; background: #fff; text-align: left; transition: border-color .16s ease, background .16s ease, transform .16s ease; }
+    .level-test-choice:hover { transform: translateY(-1px); border-color: #aaaaff; background: #f8f8ff; }
+    .level-test-choice:focus-visible { outline: 3px solid #a5a6ff; outline-offset: 2px; }
+    .level-test-level { display: inline-flex; margin: 4px 0 14px; padding: 7px 12px; border-radius: 999px; color: #4748c7; background: #eeeefe; font-size: 13px; font-weight: 800; }
+
+    /* 한국어 설명: 세션 길이 설정을 설명 문구와 선택 메뉴로 구성해요. */
+    .control-row { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin: 0 0 18px; }
+    .control-copy h2 { margin: 0; font-size: 17px; }
+    .control-copy p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+    .select-wrap { display: flex; align-items: center; gap: 10px; color: #475569; font-size: 13px; font-weight: 650; }
+    select { min-height: 42px; padding: 0 34px 0 12px; border: 1px solid var(--line); border-radius: 11px; color: #263247; background: #fff; }
+
+    /* 한국어 설명: 메인 패널과 시작 화면의 크기, 가운데 정렬, 카드 분위기를 지정해요. */
+    .main-panel { min-height: 340px; padding: clamp(22px, 5vw, 38px); }
+    .panel-content { max-width: 680px; margin: 0 auto; }
+    .welcome { display: grid; min-height: 260px; place-items: center; text-align: center; }
+    .welcome-inner { width: 100%; max-width: 620px; }
+    .welcome-icon { display: grid; width: 64px; height: 64px; place-items: center; margin: 0 auto 16px; border-radius: 20px; background: #f0f0ff; font-size: 29px; }
+    .welcome h2 { margin: 0; font-size: 23px; letter-spacing: -.04em; }
+    .welcome p { margin: 10px 0 22px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+    /* 한국어 설명: 기본 SRS와 두 가지 짧은 훈련 모드를 한 줄 또는 여러 줄로 나란히 제공해요. */
+    .welcome-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px; }
+    .welcome-actions .button { min-height: 44px; padding: 0 14px; font-size: 13px; }
+    .button {
+      display: inline-flex;
+      min-height: 46px;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 19px;
+      border: 0;
+      border-radius: 12px;
+      color: #fff;
+      background: var(--brand);
+      font-weight: 750;
+      transition: background .18s ease, transform .18s ease, box-shadow .18s ease;
+    }
+    .button:hover { transform: translateY(-1px); background: var(--brand-dark); box-shadow: 0 8px 18px #5b5ce233; }
+    .button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid #a5a6ff; outline-offset: 2px; }
+    .button.secondary { border: 1px solid var(--line); color: #334155; background: #fff; }
+    .button.secondary:hover { background: #f8f9fc; box-shadow: none; }
+    .button:disabled { cursor: not-allowed; opacity: .5; transform: none; }
+
+    /* 한국어 설명: 단어 학습 단계의 진행도와 플래시카드 스타일이에요. */
+    .stage-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+    .stage-label { color: var(--brand); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+    .progress-text { color: var(--muted); font-size: 13px; }
+    .progress-track { height: 7px; overflow: hidden; margin-top: 9px; border-radius: 9px; background: #edf0f6; }
+    .progress-fill { height: 100%; border-radius: inherit; background: var(--brand); transition: width .3s ease; }
+    .word-card { padding: clamp(20px, 5vw, 34px); border: 1px solid var(--line); border-radius: 17px; background: #fbfcff; text-align: center; }
+    .word-type { margin: 0 0 8px; color: var(--muted); font-size: 12px; }
+    /* 한국어 설명: 단어 제목과 발음 버튼을 같은 줄에 놓고 키보드 포커스도 눈에 띄게 해요. */
+    .word-title-row { display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .word-title { margin: 0; color: #202b40; font-size: clamp(32px, 7vw, 48px); letter-spacing: -.05em; }
+    .speaker-button { display: inline-grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 11px; color: #5052ce; background: #fff; font-size: 17px; transition: background .15s ease, border-color .15s ease, transform .15s ease; }
+    .speaker-button:hover:not(:disabled) { transform: translateY(-1px); border-color: #aaaaff; background: #f7f7ff; }
+    .speaker-button:focus-visible { outline: 3px solid #a5a6ff; outline-offset: 2px; }
+    .speaker-button:disabled { cursor: not-allowed; opacity: .45; }
+    .example-audio-row { display: flex; align-items: flex-start; gap: 10px; }
+    .example-audio-row .example-en { flex: 1; }
+    .example-audio-row .speaker-button { width: 32px; height: 32px; flex-basis: 32px; margin-top: -5px; font-size: 14px; }
+    .speech-status { min-height: 18px; margin: 8px 0 0; color: var(--muted); font-size: 12px; text-align: center; }
+    .word-meaning { margin: 13px 0 0; color: var(--brand-dark); font-size: 19px; font-weight: 750; }
+    .example-box { margin-top: 20px; padding: 15px; border-radius: 12px; background: #f2f4fa; text-align: left; }
+    .example-en { margin: 0; color: #334155; font-size: 14px; line-height: 1.6; }
+    .example-ko { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    .stage-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 20px; }
+    .hidden { display: none !important; }
+
+    /* 한국어 설명: 객관식 선택지, 빈칸 답 입력, 정오답 피드백과 완료 요약 스타일이에요. */
+    .question-card { padding: clamp(20px, 5vw, 30px); border: 1px solid var(--line); border-radius: 17px; background: #fbfcff; }
+    .question-kicker { margin: 0 0 9px; color: var(--brand); font-size: 12px; font-weight: 800; }
+    /* 한글 스타일 주석: 세 단계 점과 현재 단계 라벨을 조명된 진행 알약처럼 강조해요. */
+    .phase-indicator { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0 0 16px; }
+    .phase-dots { display: flex; align-items: center; gap: 5px; padding: 7px 10px; border: 1px solid #e2e8f0; border-radius: 999px; background: #fff; box-shadow: 0 3px 9px #1e293b0a; }
+    .phase-dot { color: #cbd5e1; font-size: 13px; line-height: 1; transition: color .18s ease, text-shadow .18s ease, transform .18s ease; }
+    .phase-dot.is-complete { color: #4f46e5; text-shadow: 0 0 8px #4f46e566; }
+    .phase-dot.is-current { color: #3b82f6; transform: scale(1.18); text-shadow: 0 0 9px #3b82f277; }
+    .phase-label { padding: 6px 10px; border-radius: 999px; color: #4338ca; background: #eef2ff; font-size: 11px; font-weight: 800; }
+    /* 한국어 설명: 이전에 틀려 다시 푸는 문제를 작은 배지로 구분해요. */
+    .retry-badge { display: inline-flex; align-items: center; margin: 0 0 10px 8px; padding: 4px 8px; border-radius: 999px; color: #80521d; background: #fff2d9; font-size: 11px; font-weight: 800; vertical-align: middle; }
+    .question-title-row { display: flex; align-items: center; gap: 10px; }
+    .question-title { margin: 0; font-size: clamp(20px, 4vw, 26px); line-height: 1.45; }
+    .question-support { margin: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+    .choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 20px; }
+    .choice {
+      min-height: 52px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      color: #334155;
+      background: #fff;
+      text-align: left;
+      transition: border-color .15s ease, background .15s ease;
+    }
+    .choice:hover:not(:disabled) { border-color: #aaaaff; background: #f7f7ff; }
+    .choice.correct { border-color: #54b58b; color: #16714a; background: #effaf5; }
+    .choice.incorrect { border-color: #e58c8c; color: #a43333; background: #fff4f3; }
+    .answer-row { display: flex; gap: 10px; margin-top: 20px; }
+    .answer-input { min-width: 0; min-height: 48px; flex: 1; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+    .feedback { min-height: 24px; margin: 13px 0 0; font-size: 14px; font-weight: 700; }
+    .feedback.good { color: #16804f; }
+    .feedback.bad { color: #bf4242; }
+    /* 한국어 설명: 동의어 타일을 두 열로 보여주고 선택, 정답, 오답 상태를 구분해요. */
+    .match-board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 20px; }
+    .match-column { display: grid; align-content: start; gap: 9px; }
+    .match-column-title { margin: 0 0 2px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .06em; }
+    .match-tile { min-height: 54px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 12px; color: #334155; background: #fff; font-size: 13px; font-weight: 700; text-align: left; transition: transform .15s ease, border-color .15s ease, background .15s ease, color .15s ease; }
+    .match-tile:hover:not(:disabled) { transform: translateY(-1px); border-color: #aaaaff; background: #f7f7ff; }
+    .match-tile[aria-pressed="true"] { border-color: var(--brand); color: var(--brand-dark); background: #f2f2ff; box-shadow: 0 0 0 2px #5b5ce21a; }
+    .match-tile.is-matched { border-color: #81c9a5; color: #16714a; background: #effaf5; }
+    .match-tile.is-mismatch { border-color: #e58c8c; color: #a43333; background: #fff4f3; animation: match-shake .32s ease-in-out; }
+    .match-tile:disabled { cursor: default; opacity: 1; }
+    .match-status { min-height: 24px; margin: 14px 0 0; color: var(--muted); font-size: 13px; font-weight: 700; text-align: center; }
+    .match-status.is-success { color: #16804f; }
+    @keyframes match-shake { 25% { transform: translateX(-4px); } 50% { transform: translateX(4px); } 75% { transform: translateX(-2px); } }
+    /* 한국어 설명: 예문 타이핑 모드의 문장, 의미 단서와 입력 피드백을 읽기 쉽게 나눠요. */
+    .typing-card { padding: clamp(20px, 5vw, 30px); border: 1px solid var(--line); border-radius: 17px; background: #fbfcff; }
+    .typing-context { display: grid; gap: 9px; margin-top: 16px; }
+    .typing-clue { margin: 0; padding: 12px 14px; border-radius: 11px; color: #475569; background: #f2f4fa; font-size: 13px; line-height: 1.65; }
+    .typing-clue strong { display: block; margin-bottom: 3px; color: var(--muted); font-size: 10px; letter-spacing: .06em; }
+    .typing-feedback { min-height: 23px; margin: 12px 0 0; font-size: 13px; font-weight: 750; }
+    .typing-feedback.good { color: #16804f; }
+    .typing-feedback.bad { color: #bf4242; }
+    .typing-reveal { margin-top: 10px; }
+    .mode-summary { padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: #fbfcff; text-align: center; }
+    .mode-summary h2 { margin: 0; font-size: 24px; }
+    .mode-summary p { margin: 9px 0 0; color: var(--muted); line-height: 1.7; }
+    /* 한국어 설명: 오답 직후 정답 내용을 집중해서 확인할 수 있는 안내 카드예요. */
+    .correction-screen { max-width: 680px; margin: 0 auto; }
+    .correction-heading { margin: 0 0 7px; color: var(--brand); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-align: center; }
+    .correction-title { margin: 0 0 18px; font-size: clamp(22px, 4vw, 28px); text-align: center; }
+    .correction-card { text-align: left; }
+    .correction-word-row { display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .correction-label { margin: 18px 0 5px; color: var(--muted); font-size: 11px; font-weight: 800; }
+    .correction-synonyms { margin: 0; color: #334155; font-size: 14px; line-height: 1.6; }
+    .correction-example { margin-top: 0; }
+    .correction-example-en { margin: 0; color: #334155; font-size: 14px; line-height: 1.6; }
+    .correction-example-ko { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    .summary-head { margin-bottom: 20px; text-align: center; }
+    .summary-head h2 { margin: 0; font-size: 27px; }
+    .summary-head p { margin: 8px 0 0; color: var(--muted); line-height: 1.7; }
+    .summary-score { display: flex; justify-content: center; gap: 16px; margin: 20px 0; }
+    .score-pill { padding: 12px 18px; border-radius: 13px; background: #f2f4fa; color: #475569; font-size: 14px; }
+    .score-pill strong { color: #202b40; font-size: 20px; }
+    .review-list { display: grid; gap: 9px; margin: 20px 0; }
+    .review-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 15px; border: 1px solid var(--line); border-radius: 12px; }
+    .review-word { font-weight: 750; }
+    .review-detail { color: var(--muted); font-size: 13px; text-align: right; }
+    .status-message { margin: 14px 0 0; padding: 12px 14px; border: 1px solid #f0d3b5; border-radius: 11px; color: #80521d; background: #fff9ef; font-size: 13px; line-height: 1.6; }
+    .error-message { padding: 18px; border: 1px solid #edc2c2; border-radius: 12px; color: #8f2f2f; background: #fff4f3; line-height: 1.7; }
+    .footer-note { margin: 16px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; text-align: center; }
+
+    /* 한국어 설명: 화면이 좁으면 통계와 선택지를 세로형으로 바꾸어 모바일에서도 읽기 쉽게 해요. */
+    @media (max-width: 650px) {
+      .shell { width: min(100% - 24px, 1040px); padding-top: 20px; }
+      .topbar { align-items: stretch; flex-direction: column; gap: 14px; margin-bottom: 24px; }
+      .header-user { justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+      .header-user > div { flex: 1 1 100%; }
+      .date-label { display: none; }
+      .greeting { font-size: 12px; text-align: left; }
+      .greeting-note { display: none; }
+      .profile-switch-button { min-height: 34px; padding: 0 9px; font-size: 11px; }
+      .sound-toggle-button { min-height: 34px; padding: 0 8px; font-size: 11px; }
+      .deck-trigger-button { min-height: 34px; max-width: 150px; padding: 0 8px; font-size: 11px; }
+      .dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .stat-card { display: block; min-height: 92px; padding: 12px; }
+      .stat-icon { width: 34px; height: 34px; margin-bottom: 8px; border-radius: 11px; font-size: 16px; }
+      .stat-value { font-size: 21px; }
+      .stat-label { font-size: 11px; line-height: 1.4; }
+      .control-row { align-items: flex-start; flex-direction: column; }
+      .dashboard-actions { justify-content: stretch; }
+      .dashboard-actions .button { flex: 1; }
+      .dashboard-actions .level-test-entry { flex-basis: 100%; margin-right: 0; }
+      .select-wrap { width: 100%; justify-content: space-between; }
+      select { flex: 1; max-width: 180px; }
+      .main-panel { min-height: 320px; padding: 20px 15px; }
+      .choices { grid-template-columns: 1fr; }
+      .match-board { grid-template-columns: 1fr; gap: 18px; }
+      .welcome-actions { flex-direction: column; align-items: stretch; }
+      .review-detail { font-size: 12px; }
+      .deck-drawer-panel { padding: 22px 18px; }
+    }
+
+    /* 한국어 설명: 사용자가 움직임 줄이기를 요청한 기기에서는 전환 애니메이션을 최소화해요. */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 한국어 설명: 페이지 전체 너비를 제한하고 화면 콘텐츠를 가운데에 모아요. -->
+  <div class="shell">
+    <!-- 한국어 설명: 브랜드 이름과 오늘 날짜를 보여주는 상단 영역이에요. -->
+    <header class="topbar">
+      <!-- 한국어 설명: 브랜드 전체가 세션 이탈 확인을 거쳐 홈으로 이동하는 단일 내비게이션 버튼이에요. -->
+      <button class="brand brand-link" id="brand-home-button" type="button" aria-label="Voca Impulse 홈으로 이동">
+        <span class="brand-mark" aria-hidden="true">VIP</span>
+        <span class="brand-copy">
+          <span class="brand-name">Voca Impulse</span>
+          <span class="brand-note">하루 한 걸음, 오래 기억하는 영어</span>
+        </span>
+      </button>
+      <div class="header-user">
+        <div>
+          <p class="greeting" id="user-greeting">안녕하세요!</p>
+          <p class="date-label" id="today-label"></p>
+        </div>
+        <button class="deck-trigger-button" id="deck-trigger-button" type="button" aria-haspopup="dialog" aria-controls="deck-drawer-overlay" aria-expanded="false">📑 덱: 전체 단어장 ▾</button>
+        <!-- 한국어 설명: 전체 숙련도와 Day별 로드맵은 별도 분석 창에서 확인해요. -->
+        <button class="analytics-trigger-button" id="analytics-trigger-button" type="button" aria-haspopup="dialog" aria-controls="analytics-overlay" aria-expanded="false">📊 학습 분석 &amp; 로드맵</button>
+        <!-- 한국어 설명: 첫 사용자 입력에서 음성 엔진을 깨우며 상태 안내는 아래 발음 안내 영역에 표시해요. -->
+        <button class="sound-toggle-button" id="sound-toggle-button" type="button" aria-pressed="true" aria-controls="speech-status" title="자동 발음 켜짐">🔊 소리 켜짐</button>
+      </div>
+    </header>
+
+    <!-- 한국어 설명: 숙련도 통계와 30일 로드맵은 평소 학습 화면에서 분리해 필요할 때 여는 모달에 담아요. -->
+    <div class="analytics-overlay" id="analytics-overlay" aria-hidden="true" hidden>
+      <button class="analytics-backdrop" id="analytics-backdrop" type="button" aria-label="분석 창 닫기"></button>
+      <section class="analytics-dialog" id="analytics-dialog" role="dialog" aria-modal="true" aria-labelledby="analytics-title" tabindex="-1">
+        <header class="analytics-modal-header">
+          <div>
+            <p class="eyebrow">YOUR LEARNING JOURNEY</p>
+            <h2 id="analytics-title">학습 분석 &amp; 로드맵</h2>
+            <p>기억의 단계와 Day별 진행도를 확인해 보세요.</p>
+          </div>
+          <button class="analytics-close-button" id="analytics-close-button" type="button" aria-label="분석 창 닫기">✕</button>
+        </header>
+        <div class="analytics-modal-content" id="analytics-modal-content">
+          <!-- 한국어 설명: 전체 어휘의 숙련도 단계와 오늘의 학습 지표를 동적으로 표시해요. -->
+          <section class="retention-panel" aria-labelledby="retention-title">
+            <div class="retention-heading">
+              <div>
+                <p class="eyebrow">전체 어휘 진행 현황</p>
+                <h3 id="retention-title">어휘 숙련도 피라미드</h3>
+              </div>
+              <p class="retention-total" id="retention-total">— / — 단어 학습 시작</p>
+            </div>
+            <div class="retention-bar" id="retention-bar" role="img" aria-label="어휘 기억 단계 분포">
+              <span class="retention-segment retention-segment-new" id="retention-segment-new"></span>
+              <span class="retention-segment retention-segment-learning" id="retention-segment-learning"></span>
+              <span class="retention-segment retention-segment-reviewing" id="retention-segment-reviewing"></span>
+              <span class="retention-segment retention-segment-mastered" id="retention-segment-mastered"></span>
+            </div>
+            <div class="retention-legend">
+              <div class="retention-tier"><span class="retention-dot retention-dot-new"></span><span>미학습</span><strong id="retention-count-new">—</strong></div>
+              <div class="retention-tier"><span class="retention-dot retention-dot-learning"></span><span>단기 기억</span><strong id="retention-count-learning">—</strong></div>
+              <div class="retention-tier"><span class="retention-dot retention-dot-reviewing"></span><span>중기 기억</span><strong id="retention-count-reviewing">—</strong></div>
+              <div class="retention-tier"><span class="retention-dot retention-dot-mastered"></span><span>장기 기억 마스터</span><strong id="retention-count-mastered">—</strong></div>
+            </div>
+            <div class="retention-footnote">
+              <span>오늘 복습 <strong id="due-count">—</strong></span>
+              <span>연속 학습 <strong id="streak-count">—</strong>일</span>
+              <span>오늘 오답 <strong id="mistake-count">—</strong></span>
+            </div>
+          </section>
+
+          <!-- 한국어 설명: Day 카드를 선택하면 덱을 저장하고 이 분석 창을 닫은 뒤 학습 화면으로 돌아가요. -->
+          <section class="roadmap-section" aria-labelledby="roadmap-title">
+            <div class="roadmap-heading">
+              <div>
+                <p class="eyebrow">30-DAY CHAPTER ROADMAP</p>
+                <h3 id="roadmap-title">30일 완성 로드맵</h3>
+                <p>원하는 Day를 선택해 바로 학습을 시작할 수 있어요.</p>
+              </div>
+              <button class="deck-trigger-button roadmap-all-button" id="roadmap-all-button" type="button">전체 단어장 보기</button>
+            </div>
+            <div class="chapter-roadmap" id="chapter-roadmap" aria-label="Day별 단어 학습 진행도"></div>
+          </section>
+        </div>
+        <footer class="analytics-modal-footer">
+          <button class="button secondary" id="analytics-done-button" type="button">닫기</button>
+        </footer>
+      </section>
+    </div>
+
+    <!-- 한국어 설명: 선택한 덱의 플래시카드, 퀴즈, 결과와 퀵 액션 화면을 보여줘요. -->
+    <main class="panel main-panel" id="main-container" aria-live="polite" aria-atomic="true">
+      <div class="panel-content" id="app-content">
+        <section class="study-cta-card" aria-label="핵심 학습">
+          <div class="study-cta-copy">
+            <p class="eyebrow">CORE TRAINING</p>
+            <h2>오늘의 학습을 바로 시작해요</h2>
+          </div>
+          <div class="core-training-actions">
+            <button class="button primary-study-button" id="start-button" type="button">🔥 오늘의 학습 시작하기</button>
+            <button class="button secondary secondary-study-button" id="synonym-match-button" type="button">🧩 동의어 짝짓기</button>
+            <button class="button secondary secondary-study-button" id="fill-blank-button" type="button">✍️ 예문 빈칸 쓰기</button>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- 한국어 설명: 단어 수 설정은 핵심 시작 버튼 아래에 배치해 첫 화면의 학습 진입을 우선해요. -->
+    <section class="control-row" aria-label="학습 설정">
+      <div class="control-copy">
+        <h2>나에게 맞는 학습량</h2>
+        <p>단어 수를 선택해 주세요. 한 단어마다 세 가지 방식으로 퀴즈를 풀어요.</p>
+      </div>
+      <label class="select-wrap" for="session-length">
+        <span>세션 단어 수</span>
+        <select id="session-length">
+          <option value="10">10단어 (퀴즈 30문항)</option>
+          <option value="15" selected>15단어 (퀴즈 45문항)</option>
+          <option value="25">25단어 (퀴즈 75문항)</option>
+        </select>
+      </label>
+    </section>
+
+    <!-- 한국어 설명: 복습·진단과 데이터·설정 도구를 각각 독립된 Pod로 묶어요. -->
+    <section class="quick-action-hub" aria-labelledby="quick-action-title">
+      <div class="quick-action-heading">
+        <div>
+          <p class="eyebrow">STUDY TOOLS</p>
+          <h2 id="quick-action-title">복습과 학습 도구</h2>
+        </div>
+        <span class="selected-deck-label" id="selected-deck-label">전체 단어장 · 1,500개 단어</span>
+      </div>
+      <div class="action-pods">
+        <section class="action-pod review-pod" aria-labelledby="review-pod-title">
+          <div class="action-pod-heading">
+            <span class="action-pod-icon" aria-hidden="true">🎯</span>
+            <h3 id="review-pod-title">복습 &amp; 진단</h3>
+          </div>
+          <div class="pod-actions">
+            <button class="button secondary secondary-study-button level-test-entry" id="level-test-button" type="button">🎯 어휘 레벨 테스트</button>
+            <button class="button secondary secondary-study-button" id="review-mistakes-button" type="button">오늘 틀린 단어 복습하기</button>
+            <button class="button secondary secondary-study-button" id="review-today-words-button" type="button">오늘 학습한 전체 단어 다시보기</button>
+            <button class="button secondary secondary-study-button hidden" id="review-mastered-deck-button" type="button">선택한 덱 전체 다시보기</button>
+            <button class="button secondary secondary-study-button" id="study-extra-button" type="button">추가 단어 공부하기</button>
+          </div>
+        </section>
+        <section class="action-pod data-pod" aria-labelledby="data-pod-title">
+          <div class="action-pod-heading">
+            <span class="action-pod-icon" aria-hidden="true">⚙️</span>
+            <h3 id="data-pod-title">데이터 &amp; 설정</h3>
+          </div>
+          <div class="pod-actions tertiary-actions">
+            <button class="button tertiary-action" id="backup-export-button" type="button">💾 학습 기록 백업 (JSON)</button>
+            <button class="button tertiary-action" id="backup-import-button" type="button">📂 기록 불러오기</button>
+            <button class="button tertiary-action profile-switch-button" id="switch-profile-button" type="button">👤 프로필 전환</button>
+            <input id="backup-file-input" type="file" accept=".json,application/json" hidden>
+          </div>
+          <p class="backup-status" id="backup-status" role="status" aria-live="polite"></p>
+          <p class="pod-note">백업에는 현재 프로필의 기기 내 학습 기록이 포함돼요.</p>
+        </section>
+      </div>
+    </section>
+    <!-- 한국어 설명: 영어 음성 선택 결과와 재생/오류 상태를 화면 및 스크린 리더에 안내해요. -->
+    <p class="speech-status" id="speech-status" role="status" aria-live="polite" aria-atomic="true" aria-label="영어 발음 안내"></p>
+    <!-- 한국어 설명: 학습 기록은 이 브라우저의 로컬 저장소에만 보관됨을 안내해요. -->
+    <p class="footer-note">학습 기록은 이 기기의 브라우저에 저장돼요. 브라우저 데이터를 지우면 기록도 함께 사라질 수 있어요.</p>
+  </div>
+  <!-- 한국어 설명: 배경, 닫기 버튼, 덱 항목을 눌러 닫을 수 있는 슬라이드형 덱 서랍이에요. -->
+  <div class="deck-drawer-overlay" id="deck-drawer-overlay" aria-hidden="true">
+    <button class="deck-drawer-backdrop" id="deck-drawer-backdrop" type="button" tabindex="-1" aria-label="덱 선택 창 닫기"></button>
+    <aside class="deck-drawer-panel" role="dialog" aria-modal="true" aria-labelledby="deck-drawer-title">
+      <div class="deck-drawer-header">
+        <div>
+          <h2 class="deck-drawer-title" id="deck-drawer-title">단어 덱 선택 (Chapter Decks)</h2>
+          <p class="deck-drawer-subtitle">학습할 챕터를 선택해 주세요. 덱별 단어 수와 마스터 현황을 확인할 수 있어요.</p>
+        </div>
+        <button class="deck-drawer-close" id="deck-drawer-close" type="button" aria-label="덱 선택 창 닫기">✕</button>
+      </div>
+      <div class="deck-options" id="deck-options" aria-label="사용 가능한 단어 덱"></div>
+    </aside>
+  </div>
+  <!-- 한국어 설명: 저장된 학습자를 선택하거나 새 이름을 입력하는 접근성 지원 프로필 모달이에요. -->
+  <div class="profile-overlay" id="profile-overlay" hidden>
+    <section class="profile-dialog" role="dialog" aria-modal="true" aria-labelledby="profile-dialog-title" aria-describedby="profile-dialog-description">
+      <h2 id="profile-dialog-title">이름을 선택하거나 입력해 주세요</h2>
+      <p class="profile-dialog-copy" id="profile-dialog-description">이름별로 학습 기록을 안전하게 나누어 저장해요. 기존 프로필을 선택하거나 새 학습자 이름을 입력해 주세요.</p>
+      <div class="profile-list" id="profile-list" aria-label="저장된 학습 프로필"></div>
+      <p class="profile-empty hidden" id="profile-empty">아직 저장된 프로필이 없어요. 아래에 이름을 입력해 시작해 보세요.</p>
+      <form class="profile-form" id="profile-form">
+        <label for="profile-name-input">새 학습자 이름</label>
+        <input class="profile-input" id="profile-name-input" type="text" maxlength="40" autocomplete="name" placeholder="예: 민지" required>
+        <p class="profile-error" id="profile-error" role="alert" aria-live="polite"></p>
+        <div class="profile-dialog-actions">
+          <button class="button secondary hidden" id="cancel-profile-button" type="button">취소</button>
+          <button class="button" type="submit">이 이름으로 시작하기</button>
+        </div>
+      </form>
+    </section>
+  </div>
+  <!-- 한국어 설명: 진행 중 학습을 실수로 중단하지 않도록 이탈 확인 대화상자를 표시해요. -->
+  <div class="session-exit-overlay" id="session-exit-overlay" hidden>
+    <button class="session-exit-backdrop" id="session-exit-backdrop" type="button" tabindex="-1" aria-label="학습 계속하기"></button>
+    <section class="session-exit-dialog" role="alertdialog" aria-modal="true" aria-labelledby="session-exit-title" aria-describedby="session-exit-description">
+      <div class="session-exit-icon" aria-hidden="true">📚</div>
+      <h2 id="session-exit-title">진행 중인 학습이 있어요</h2>
+      <p id="session-exit-description">진행 중인 학습이 중단돼요. 이미 저장된 기록은 유지돼요. 대시보드로 나갈까요?</p>
+      <div class="session-exit-actions">
+        <button class="button secondary" id="session-exit-stay-button" type="button">계속 학습하기</button>
+        <button class="button session-exit-confirm-button" id="session-exit-confirm-button" type="button">나가기</button>
+      </div>
+    </section>
+  </div>
+  <!-- 한국어 설명: defer로 HTML 요소를 읽을 수 있는 시점에 순수 JavaScript 앱을 실행해요. -->
+  <script src="app.js" defer></script>
+  <!-- 한글 설명 주석: HTTPS 또는 localhost 환경에서만 브라우저가 서비스 워커를 안전하게 등록해요. -->
+  <script>
+    if ("serviceWorker" in navigator && window.isSecureContext) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js")
+          .catch((error) => console.error("서비스 워커 등록에 실패했어요:", error));
+      });
+    }
+  </script>
+</body>
+</html>

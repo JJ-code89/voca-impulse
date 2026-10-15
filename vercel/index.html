@@ -498,11 +498,12 @@
               </div>
             </div>
             <form id="settings-feedback-form" class="feedback-form">
-              <!-- 한글 설명 주석: 이 값을 idjin1009@gmail.com에 연결해 발급한 Web3Forms 키로 교체해 주세요. -->
-              <input id="web3forms-access-key" type="hidden" name="access_key" value="YOUR_WEB3FORMS_ACCESS_KEY">
+              <!-- 한글 설명 주석: Web3Forms access key와 현재 프로필 이름은 app.js가 JSON 요청에 포함해요. -->
+              <input id="web3forms-access-key" type="hidden" name="access_key" value="e7807663-036b-4df4-84fb-2ff52d7d4b3b">
               <label class="visually-hidden" for="settings-feedback-message">후기 및 개선 의견</label>
               <textarea id="settings-feedback-message" name="message" rows="4" maxlength="2000" placeholder="사용하면서 좋았던 점이나 바라는 기능을 알려 주세요." required></textarea>
-              <p class="feedback-privacy-note">의견을 보내면 Web3Forms를 통해 idjin1009@gmail.com으로 전달돼요. 실제 전송을 위해 해당 이메일에 연결된 Web3Forms access key 설정이 필요해요.</p>
+              <!-- 한글 설명 주석: 수신 이메일 주소는 공개하지 않고 의견 전달에 필요한 정보만 안내해요. -->
+              <p class="feedback-privacy-note">소중한 의견은 현재 프로필 이름과 함께 개발자에게 안전하게 전달됩니다.</p>
               <div class="feedback-submit-row">
                 <p class="feedback-status" id="settings-feedback-status" role="status" aria-live="polite"></p>
                 <button class="button feedback-submit-button" type="submit">의견 보내기</button>

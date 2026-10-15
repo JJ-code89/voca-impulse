@@ -1,5 +1,5 @@
 // 한글 설명 주석: 캐시 버전을 올리면 이전 앱 파일을 남기지 않고 새 정적 파일로 교체해요.
-const CACHE_NAME = "voca-impulse-v5";
+const CACHE_NAME = "voca-impulse-v7";
 
 // 한글 설명 주석: 앱 셸과 단어 데이터를 미리 저장해 네트워크가 없어도 기본 학습 화면을 열 수 있어요.
 const CORE_ASSETS = [

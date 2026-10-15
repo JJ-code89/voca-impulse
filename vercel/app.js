@@ -40,8 +40,11 @@ const LEGACY_STORAGE_KEY = "wordstep-progress-v1";
 const AUTO_SOUND_STORAGE_KEY = "vocab_auto_sound_enabled";
 // 한글 설명 주석: 홈 화면 설치 안내의 닫힘 상태는 학습자 프로필과 분리해 기기 전체에 기억해요.
 const INSTALL_GUIDE_STORAGE_KEY = "vocab_install_guide_dismissed";
-// 한글 설명 주석: 피드백은 Web3Forms의 지정 이메일 수신자 연결 키를 HTML 설정 필드에서 읽어요.
+// 한글 설명 주석: Web3Forms 피드백 API 주소예요. 요청 키는 설정 모달의 숨겨진 입력에서 읽어요.
 const WEB3FORMS_ENDPOINT = "https://api.web3forms.com/submit";
+// 한글 설명 주석: 브라우저별 하루 피드백 횟수와 전송 중 예약 슬롯을 별도 키로 관리해요.
+const FEEDBACK_QUOTA_STORAGE_KEY = "voca_feedback_limit";
+const FEEDBACK_DAILY_LIMIT = 3;
 // 한글 설명 주석: 덱 값과 이름은 단어 데이터에서 읽어 자동으로 구성해요.
 const DECK_VALUES = ["all"];
 const DECK_TITLES = { all: "전체 단어장" };
@@ -1209,6 +1212,78 @@ function handleSettingsModalKeydown(event) {
   }
 }
 
+// 한글 설명 주석: 오늘 사용한 횟수와 진행 중인 요청 예약을 함께 읽어 여러 탭에서 한도를 넘지 않게 해요.
+function readFeedbackQuota() {
+  const today = getLocalDateKey();
+  const savedQuota = localStorage.getItem(FEEDBACK_QUOTA_STORAGE_KEY);
+  if (!savedQuota) {
+    return { date: today, count: 0, pending: [] };
+  }
+
+  let quota;
+  try {
+    quota = JSON.parse(savedQuota);
+  } catch {
+    throw new Error("저장된 의견 전송 횟수 정보가 올바르지 않아요.");
+  }
+
+  if (!quota || typeof quota !== "object" ||
+      typeof quota.date !== "string" ||
+      !Number.isInteger(quota.count) || quota.count < 0 ||
+      (quota.pending !== undefined &&
+        (!Array.isArray(quota.pending) || !quota.pending.every((id) => typeof id === "string")))) {
+    throw new Error("저장된 의견 전송 횟수 정보가 올바르지 않아요.");
+  }
+  if (quota.date !== today) {
+    return { date: today, count: 0, pending: [] };
+  }
+
+  return {
+    date: today,
+    count: quota.count,
+    pending: quota.pending || []
+  };
+}
+
+// 한글 설명 주석: 전송을 시작할 때 슬롯을 동기적으로 예약해 동시에 제출해도 하루 3회를 넘지 않게 해요.
+function reserveFeedbackQuota() {
+  const quota = readFeedbackQuota();
+  if (quota.count + quota.pending.length >= FEEDBACK_DAILY_LIMIT) {
+    return null;
+  }
+
+  const reservationId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  quota.pending.push(reservationId);
+  localStorage.setItem(FEEDBACK_QUOTA_STORAGE_KEY, JSON.stringify(quota));
+  return { reservationId, remainingAfterReservation: FEEDBACK_DAILY_LIMIT - quota.count - quota.pending.length };
+}
+
+// 한글 설명 주석: Web3Forms가 성공하면 예약을 확정해 오늘 보낸 횟수를 증가시켜요.
+function confirmFeedbackQuota(reservationId) {
+  const quota = readFeedbackQuota();
+  const reservationIndex = quota.pending.indexOf(reservationId);
+  if (reservationIndex === -1) {
+    throw new Error("의견 전송 횟수 예약을 확인할 수 없어요.");
+  }
+
+  quota.pending.splice(reservationIndex, 1);
+  quota.count += 1;
+  localStorage.setItem(FEEDBACK_QUOTA_STORAGE_KEY, JSON.stringify(quota));
+  return FEEDBACK_DAILY_LIMIT - quota.count - quota.pending.length;
+}
+
+// 한글 설명 주석: 요청이 실패하면 사용하지 않은 예약만 해제해 다시 시도할 수 있도록 해요.
+function releaseFeedbackQuota(reservationId) {
+  const quota = readFeedbackQuota();
+  const reservationIndex = quota.pending.indexOf(reservationId);
+  if (reservationIndex === -1) {
+    return;
+  }
+
+  quota.pending.splice(reservationIndex, 1);
+  localStorage.setItem(FEEDBACK_QUOTA_STORAGE_KEY, JSON.stringify(quota));
+}
+
 // 한글 설명 주석: 사용자의 동의를 받은 의견만 Web3Forms로 보내고 서버가 성공을 확인한 뒤 입력을 비워요.
 async function handleFeedbackSubmit(event) {
   event.preventDefault();
@@ -1224,8 +1299,21 @@ async function handleFeedbackSubmit(event) {
     return;
   }
 
-  if (!accessKey || accessKey === "YOUR_WEB3FORMS_ACCESS_KEY") {
-    settingsFeedbackStatus.textContent = "아직 의견 전송을 설정하지 않았어요. idjin1009@gmail.com에 연결된 Web3Forms access key를 등록해 주세요.";
+  if (!accessKey) {
+    settingsFeedbackStatus.textContent = "아직 의견 전송을 설정하지 않았어요. 설정을 확인해 주세요.";
+    return;
+  }
+
+  let quotaReservation;
+  try {
+    quotaReservation = reserveFeedbackQuota();
+  } catch (error) {
+    console.error("피드백 전송 횟수를 확인하지 못했어요:", error);
+    settingsFeedbackStatus.textContent = "오늘 의견 전송 한도를 확인하지 못했어요. 브라우저 저장 공간을 확인한 뒤 다시 시도해 주세요.";
+    return;
+  }
+  if (!quotaReservation) {
+    settingsFeedbackStatus.textContent = "오늘 의견 보내기 한도(1일 최대 3회)를 모두 사용했습니다. 내일 다시 이용해 주세요.";
     return;
   }
 
@@ -1238,8 +1326,9 @@ async function handleFeedbackSubmit(event) {
   submitButton.textContent = "전송 중...";
   settingsFeedbackStatus.textContent = "의견을 전송하고 있어요...";
 
+  let submissionConfirmed = false;
   try {
-    // 한글 설명 주석: Web3Forms는 access_key에 연결된 수신 주소로 제목과 메시지를 이메일 전달해요.
+    // 한글 설명 주석: 이메일 주소는 화면에 노출하지 않고 현재 프로필과 의견만 Web3Forms로 안전하게 전송해요.
     const response = await fetch(WEB3FORMS_ENDPOINT, {
       method: "POST",
       headers: {
@@ -1249,7 +1338,8 @@ async function handleFeedbackSubmit(event) {
       body: JSON.stringify({
         access_key: accessKey,
         subject: "[Voca Impulse] 새로운 사용자 피드백",
-        from_name: "Voca Impulse 사용자",
+        name: activeUserName,
+        from_name: activeUserName,
         message: feedback
       })
     });
@@ -1261,11 +1351,30 @@ async function handleFeedbackSubmit(event) {
         : `Web3Forms 요청에 실패했어요 (HTTP ${response.status}).`);
     }
 
+    submissionConfirmed = true;
     settingsFeedbackMessage.value = "";
-    settingsFeedbackStatus.textContent = "소중한 의견이 개발자에게 전송되었습니다! 감사합니다.";
+    try {
+      const remainingCount = confirmFeedbackQuota(quotaReservation.reservationId);
+      quotaReservation = null;
+      settingsFeedbackStatus.textContent =
+        `소중한 피드백이 개발자에게 전송되었습니다! (오늘 남은 횟수: ${remainingCount}회)`;
+    } catch (error) {
+      console.error("피드백은 전송됐지만 일일 횟수를 저장하지 못했어요:", error);
+      settingsFeedbackStatus.textContent =
+        `소중한 피드백이 개발자에게 전송되었습니다! (오늘 남은 횟수: ${quotaReservation.remainingAfterReservation}회)`;
+    }
   } catch (error) {
     console.error("Web3Forms feedback submission failed:", error);
-    settingsFeedbackStatus.textContent = "의견을 전송하지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.";
+    if (quotaReservation && !submissionConfirmed) {
+      try {
+        releaseFeedbackQuota(quotaReservation.reservationId);
+      } catch (quotaError) {
+        console.error("사용하지 않은 피드백 횟수 예약을 해제하지 못했어요:", quotaError);
+      }
+    }
+    settingsFeedbackStatus.textContent = submissionConfirmed
+      ? "피드백은 전송됐지만 일일 전송 횟수를 저장하지 못했어요."
+      : "의견을 전송하지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.";
   } finally {
     feedbackSubmitting = false;
     settingsFeedbackForm.removeAttribute("aria-busy");

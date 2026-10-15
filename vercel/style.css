@@ -417,6 +417,10 @@ body {
   gap: 13px;
 }
 
+.action-pods.review-actions-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .action-pod {
   min-width: 0;
   padding: 15px;
@@ -518,6 +522,31 @@ body {
   transition: background .18s ease, box-shadow .18s ease, border-color .18s ease;
 }
 
+.settings-trigger-button {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  color: #475569;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+  transition: border-color .18s ease, color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+
+.settings-trigger-button:hover:not(:disabled) {
+  border-color: #c7d2fe;
+  color: #4338ca;
+  background: #f8f8ff;
+  box-shadow: 0 5px 14px #5b5ce214;
+}
+
+.settings-trigger-button:focus-visible {
+  outline: 3px solid #a5a6ff;
+  outline-offset: 2px;
+}
+
 .analytics-trigger-button:hover:not(:disabled) {
   border-color: #bfc0ff;
   background: #ececff;
@@ -531,7 +560,8 @@ body {
 
 .analytics-trigger-button:focus-visible,
 .analytics-close-button:focus-visible,
-.analytics-modal-footer .button:focus-visible {
+.analytics-modal-footer .button:focus-visible,
+.settings-trigger-button:focus-visible {
   outline: 3px solid #a5a6ff;
   outline-offset: 2px;
 }
@@ -555,6 +585,10 @@ body {
 }
 
 body.analytics-open {
+  overflow: hidden;
+}
+
+body.settings-open {
   overflow: hidden;
 }
 
@@ -678,6 +712,212 @@ body.analytics-open {
   font-size: 12px;
 }
 
+/* 한글 스타일 주석: 넓은 분석 모달 스타일을 재사용하되 설정은 짧고 스크롤하기 편한 폭으로 제한해요. */
+.settings-dialog {
+  width: min(100%, 720px);
+  max-height: min(90vh, 860px);
+}
+
+.settings-modal-content {
+  display: grid;
+  gap: 12px;
+  padding-top: 2px;
+  padding-bottom: 16px;
+}
+
+.settings-section {
+  min-width: 0;
+  padding: 17px 18px;
+  border: 1px solid #e7eaf1;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.settings-section-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin-bottom: 13px;
+}
+
+.settings-section-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  border-radius: 11px;
+  background: #f0f1ff;
+  font-size: 16px;
+}
+
+.settings-section-heading h3 {
+  margin: 0;
+  color: #263247;
+  font-size: 14px;
+  font-weight: 850;
+  letter-spacing: -.025em;
+}
+
+.settings-section-heading p {
+  margin: 4px 0 0;
+  color: #748096;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.settings-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 13px;
+  border: 1px solid #edf0f5;
+  border-radius: 12px;
+  background: #fafbfe;
+}
+
+.settings-option-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-option-copy strong,
+.settings-session-select > span {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.settings-option-copy span {
+  color: #748096;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.settings-session-select {
+  display: grid;
+  gap: 8px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.settings-session-select select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #dfe4ee;
+  border-radius: 11px;
+  color: #334155;
+  background: #fff;
+  font-size: 12px;
+}
+
+.settings-session-select select:focus-visible,
+.feedback-form textarea:focus-visible {
+  outline: 3px solid #c7d2fe;
+  outline-offset: 2px;
+  border-color: #818cf8;
+}
+
+.settings-data-pod {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.settings-data-pod .tertiary-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 12px;
+}
+
+.settings-data-pod .button.tertiary-action {
+  min-height: 40px !important;
+  padding: 0 12px !important;
+  border-color: #edf0f5;
+  border-radius: 11px;
+  background: #fafbfe;
+  font-size: 11px !important;
+}
+
+.settings-data-pod .button.tertiary-action:hover:not(:disabled) {
+  border-color: #c7d2fe;
+  color: #4338ca;
+  background: #f7f7ff;
+}
+
+.settings-data-pod .backup-status:not(:empty) {
+  min-height: 20px;
+  margin-top: 9px;
+}
+
+.feedback-form {
+  display: grid;
+  gap: 9px;
+}
+
+.feedback-form textarea {
+  width: 100%;
+  min-height: 105px;
+  resize: vertical;
+  padding: 12px 13px;
+  border: 1px solid #dfe4ee;
+  border-radius: 12px;
+  color: #334155;
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.feedback-form textarea::placeholder {
+  color: #9aa4b4;
+}
+
+.feedback-privacy-note {
+  margin: 0;
+  color: #8a94a5;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.feedback-submit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.feedback-status {
+  min-height: 18px;
+  margin: 0;
+  color: #18794e;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.feedback-submit-button {
+  min-height: 39px;
+  flex: 0 0 auto;
+  padding: 0 16px;
+  font-size: 12px;
+}
+
+.settings-modal-footer {
+  justify-content: flex-end;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
 @media (max-width: 900px) {
   .chapter-roadmap {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -773,6 +1013,10 @@ body.analytics-open {
     border-radius: 19px;
   }
 
+  .settings-dialog {
+    max-height: 96vh;
+  }
+
   .analytics-modal-header {
     gap: 12px;
     padding: 20px 17px 14px;
@@ -795,6 +1039,19 @@ body.analytics-open {
   .analytics-modal-footer .button {
     width: 100%;
   }
+
+  .settings-modal-footer {
+    align-items: stretch;
+  }
+
+  .settings-data-pod .tertiary-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-option-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 /* 한국어 스타일 주석: 학습 이탈 확인은 화면 위에 부드러운 블러 배경과 선택이 분명한 모달로 보여줘요. */
@@ -805,6 +1062,144 @@ body.analytics-open {
   display: grid;
   place-items: center;
   padding: 20px;
+}
+
+/* 한글 스타일 주석: 세션마다 필요한 분량을 고르는 선택 창을 다른 모달과 같은 반응형 레이어로 표시해요. */
+.batch-size-overlay {
+  position: fixed;
+  z-index: 55;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.batch-size-overlay[hidden] {
+  display: none;
+}
+
+.batch-size-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: #10172acc;
+  backdrop-filter: blur(5px);
+  cursor: default;
+}
+
+.batch-size-dialog {
+  position: relative;
+  width: min(100%, 440px);
+  padding: 25px;
+  border: 1px solid #e4e8f2;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 24px 70px #10172a38;
+}
+
+.batch-size-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.batch-size-heading .eyebrow {
+  margin: 0 0 7px;
+}
+
+.batch-size-heading h2 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 21px;
+  letter-spacing: -.03em;
+}
+
+.batch-size-close {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 11px;
+  color: #64748b;
+  background: #fff;
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.batch-size-close:hover {
+  color: #312e81;
+  background: #f5f5ff;
+}
+
+.batch-size-description {
+  margin: 13px 0 17px;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.batch-size-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.batch-size-option {
+  min-height: 54px;
+  border: 1px solid #e1e5ef;
+  border-radius: 13px;
+  color: #344054;
+  background: #fff;
+  font-size: 14px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: border-color .16s ease, color .16s ease, background .16s ease, transform .16s ease;
+}
+
+.batch-size-option:hover {
+  transform: translateY(-1px);
+  border-color: #a5b4fc;
+  color: #4338ca;
+  background: #f8f8ff;
+}
+
+.batch-size-option.is-selected {
+  border-color: #6366f1;
+  color: #4338ca;
+  background: #eef0ff;
+  box-shadow: inset 0 0 0 1px #6366f1;
+}
+
+.batch-size-option:focus-visible,
+.batch-size-close:focus-visible {
+  outline: 3px solid #818cf8;
+  outline-offset: 3px;
+}
+
+.batch-size-availability {
+  min-height: 20px;
+  margin: 14px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 480px) {
+  .batch-size-overlay {
+    padding: 14px;
+  }
+
+  .batch-size-dialog {
+    padding: 21px 17px;
+    border-radius: 18px;
+  }
+
+  .batch-size-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .session-exit-overlay[hidden] {
@@ -1142,5 +1537,232 @@ body.analytics-open {
 
   .flashcard-next-button {
     width: 100%;
+  }
+}
+
+/* 한글 스타일 주석: 집중 학습 중에는 대시보드와 설정을 숨기고 학습 카드만 전체 화면에 가깝게 배치해요. */
+body.focus-mode {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #f8fafc;
+}
+
+body.focus-mode .shell {
+  display: flex;
+  width: 100%;
+  max-width: none;
+  min-height: 100vh;
+  min-height: 100dvh;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+}
+
+body.focus-mode .topbar,
+body.focus-mode .control-row,
+body.focus-mode .quick-action-hub,
+body.focus-mode .speech-status,
+body.focus-mode .footer-note {
+  display: none !important;
+}
+
+body.focus-mode #main-container.main-panel {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 100vh;
+  min-height: 100dvh;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: clamp(68px, 10vh, 100px) clamp(16px, 4vw, 48px) clamp(28px, 6vh, 56px);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.focus-mode #app-content {
+  width: min(100%, 900px);
+}
+
+/* 한글 스타일 주석: 설치 안내를 학습 CTA 바로 위의 가벼운 배너로 배치하고 핵심 버튼보다 낮은 시각적 무게를 줘요. */
+.install-guide-banner {
+  margin: 0 0 16px;
+  padding: clamp(16px, 2.5vw, 22px);
+  border: 1px solid #dfe5ff;
+  border-radius: 18px;
+  background: linear-gradient(115deg, #f2f3ff 0%, #fff 54%, #eff7ff 100%);
+  box-shadow: 0 8px 24px #4f46e50c;
+}
+
+.install-guide-banner[hidden] {
+  display: none;
+}
+
+#install-guide-reopen-button[hidden] {
+  display: none !important;
+}
+
+.install-guide-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.install-guide-heading h2 {
+  margin: 0;
+  color: #26325b;
+  font-size: clamp(15px, 2.4vw, 19px);
+  font-weight: 850;
+  letter-spacing: -.035em;
+  line-height: 1.5;
+}
+
+.install-guide-close {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border: 1px solid #e2e6f2;
+  border-radius: 999px;
+  color: #64748b;
+  background: #fff;
+  font-size: 11px;
+  font-weight: 750;
+  transition: border-color .16s ease, color .16s ease, background .16s ease;
+}
+
+.install-guide-close:hover {
+  border-color: #c7d2fe;
+  color: #4338ca;
+  background: #f8f8ff;
+}
+
+.install-guide-close:focus-visible,
+#install-guide-reopen-button:focus-visible {
+  outline: 3px solid #a5b4fc;
+  outline-offset: 2px;
+}
+
+.install-guide-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 15px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.install-guide-steps li {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid #e7eaf4;
+  border-radius: 13px;
+  background: #ffffffc9;
+}
+
+.install-guide-step-number {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  flex: 0 0 23px;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #5b5ce2;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.install-guide-steps p {
+  margin: 1px 0 0;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.install-guide-steps strong {
+  color: #3438a4;
+  font-weight: 850;
+}
+
+.install-guide-steps p span {
+  color: #748096;
+  font-size: 10px;
+}
+
+body.focus-mode #install-guide-banner {
+  display: none !important;
+}
+
+/* 한글 스타일 주석: 집중 도구막대는 음소거와 종료만 제공하는 최소 헤더로 안전 영역에 고정해요. */
+.focus-toolbar {
+  position: fixed;
+  z-index: 5;
+  top: max(14px, env(safe-area-inset-top));
+  right: max(14px, env(safe-area-inset-right));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.focus-toolbar[hidden] {
+  display: none;
+}
+
+/* 한글 스타일 주석: 닫기 버튼은 기존 확인 모달보다 낮은 레이어에 두고 키보드 포커스를 분명히 표시해요. */
+.focus-exit-button {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid #dfe4ee;
+  border-radius: 14px;
+  color: #475569;
+  background: #fff;
+  box-shadow: 0 5px 18px #1e293b14;
+  font-size: 20px;
+  line-height: 1;
+  transition: transform .16s ease, border-color .16s ease, background .16s ease;
+}
+
+.focus-exit-button:hover {
+  transform: translateY(-1px);
+  border-color: #c7d2fe;
+  background: #f8f8ff;
+}
+
+.focus-exit-button:focus-visible {
+  outline: 3px solid #a5b4fc;
+  outline-offset: 3px;
+}
+
+.focus-exit-button[hidden] {
+  display: none;
+}
+
+@media (max-width: 650px) {
+  .install-guide-steps {
+    grid-template-columns: 1fr;
+    gap: 7px;
+    margin-top: 12px;
+  }
+
+  .install-guide-steps li {
+    padding: 9px 11px;
+  }
+
+  .install-guide-steps p {
+    font-size: 11px;
+  }
+
+  body.focus-mode #main-container.main-panel {
+    padding-right: 14px;
+    padding-left: 14px;
   }
 }

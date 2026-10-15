@@ -38,11 +38,17 @@ const USER_DATA_PREFIX = "vocab_data_";
 const LEGACY_STORAGE_KEY = "wordstep-progress-v1";
 // 한글 설명 주석: 자동 발음 설정은 학습 기록과 분리된 브라우저 설정 키에 저장해요.
 const AUTO_SOUND_STORAGE_KEY = "vocab_auto_sound_enabled";
+// 한글 설명 주석: 홈 화면 설치 안내의 닫힘 상태는 학습자 프로필과 분리해 기기 전체에 기억해요.
+const INSTALL_GUIDE_STORAGE_KEY = "vocab_install_guide_dismissed";
+// 한글 설명 주석: 피드백은 Web3Forms의 지정 이메일 수신자 연결 키를 HTML 설정 필드에서 읽어요.
+const WEB3FORMS_ENDPOINT = "https://api.web3forms.com/submit";
 // 한글 설명 주석: 덱 값과 이름은 단어 데이터에서 읽어 자동으로 구성해요.
 const DECK_VALUES = ["all"];
 const DECK_TITLES = { all: "전체 단어장" };
 // 한글 설명 주석: 상태 1, 2, 3에서 정답을 맞힌 뒤 적용할 복습 간격(일)이에요.
 const INTERVAL_DAYS = { 1: 1, 2: 4, 3: 14 };
+// 한글 설명 주석: 저장 설정과 백업 검증, 세션 분량 선택 모달이 공통으로 허용하는 단어 수예요.
+const SESSION_LENGTH_OPTIONS = [10, 15, 20, 25, 30, 50];
 // 한글 설명 주석: 화면에서 데이터를 표시하거나 갱신할 때 사용하는 HTML 요소예요.
 const appContent = document.querySelector("#app-content");
 const startButton = document.querySelector("#start-button");
@@ -53,9 +59,27 @@ const deckDrawerOverlay = document.querySelector("#deck-drawer-overlay");
 const deckDrawerBackdrop = document.querySelector("#deck-drawer-backdrop");
 const deckDrawerCloseButton = document.querySelector("#deck-drawer-close");
 const deckOptionsContainer = document.querySelector("#deck-options");
-// 한글 설명 주석: 헤더의 소리 버튼은 자동 발음 설정을 표시하고 사용자의 클릭을 받아요.
+// 한글 설명 주석: 설정 창의 소리 버튼은 자동 발음 설정을 표시하고 사용자의 클릭을 받아요.
 const soundToggleButton = document.querySelector("#sound-toggle-button");
+// 한글 설명 주석: 하나의 소리 버튼을 설정 창과 집중 도구막대 사이에서 이동해 설정 상태를 일관되게 유지해요.
+const soundTogglePlaceholder = document.querySelector("#settings-sound-placeholder");
+const focusToolbar = document.querySelector("#focus-toolbar");
+// 한글 설명 주석: 설치 안내 배너와 닫기/설정에서 다시 보기 동작에 사용할 요소예요.
+const installGuideBanner = document.querySelector("#install-guide-banner");
+const installGuideCloseButton = document.querySelector("#install-guide-close");
+const installGuideReopenButton = document.querySelector("#install-guide-reopen-button");
 const todayLabel = document.querySelector("#today-label");
+// 한글 설명 주석: 설정 버튼, 모달 배경, 닫기 버튼과 피드백 입력을 각각 찾아 이벤트에서 재사용해요.
+const settingsTriggerButton = document.querySelector("#settings-trigger-button");
+const settingsOverlay = document.querySelector("#settings-overlay");
+const settingsBackdrop = document.querySelector("#settings-backdrop");
+const settingsDialog = document.querySelector("#settings-dialog");
+const settingsCloseButton = document.querySelector("#settings-close-button");
+const settingsDoneButton = document.querySelector("#settings-done-button");
+const settingsFeedbackForm = document.querySelector("#settings-feedback-form");
+const settingsFeedbackMessage = document.querySelector("#settings-feedback-message");
+const settingsFeedbackStatus = document.querySelector("#settings-feedback-status");
+const web3FormsAccessKeyInput = document.querySelector("#web3forms-access-key");
 // 한글 설명 주석: 대시보드에서 바로 여는 오늘 오답 복습과 추가 단어 버튼이에요.
 const reviewMistakesButton = document.querySelector("#review-mistakes-button");
 const studyExtraButton = document.querySelector("#study-extra-button");
@@ -97,21 +121,43 @@ const cancelProfileButton = document.querySelector("#cancel-profile-button");
 const userGreeting = document.querySelector("#user-greeting");
 // 한글 설명 주석: 브랜드 전체를 대시보드로 돌아가는 유일한 헤더 내비게이션으로 사용해요.
 const brandHomeButton = document.querySelector("#brand-home-button");
+// 한글 설명 주석: 집중 화면 닫기는 채점 중이면 종료 확인을, 읽기 전용 화면이면 즉시 대시보드 이동을 요청해요.
+const focusExitButton = document.querySelector("#focus-exit-button");
 // 한글 설명 주석: 진행 중 세션에서 나갈 때 확인할 모달, 마지막 포커스와 승인 후 실행할 작업이에요.
 const sessionExitOverlay = document.querySelector("#session-exit-overlay");
 const sessionExitBackdrop = document.querySelector("#session-exit-backdrop");
 const sessionExitStayButton = document.querySelector("#session-exit-stay-button");
 const sessionExitConfirmButton = document.querySelector("#session-exit-confirm-button");
+// 한글 설명 주석: 세션 분량 선택 모달의 제목, 옵션, 닫기 동작에 필요한 요소예요.
+const batchSizeOverlay = document.querySelector("#batch-size-overlay");
+const batchSizeBackdrop = document.querySelector("#batch-size-backdrop");
+const batchSizeDialog = document.querySelector("#batch-size-dialog");
+const batchSizeTitle = document.querySelector("#batch-size-title");
+const batchSizeDescription = document.querySelector("#batch-size-description");
+const batchSizeOptions = document.querySelector("#batch-size-options");
+const batchSizeAvailability = document.querySelector("#batch-size-availability");
+const batchSizeCloseButton = document.querySelector("#batch-size-close");
 let activeStudySession = false;
 let pendingSessionExitAction = null;
 let sessionExitReturnFocus = null;
 let studyControlsLocked = false;
+// 한글 설명 주석: 선택 창이 오늘 학습/추가 학습 중 어떤 세션을 시작할지 기억해요.
+let batchSizeSelectionMode = "regular";
+let batchSizeReturnFocus = null;
+// 한글 설명 주석: 설정 모달의 닫힘 애니메이션과 마지막 포커스를 별도로 관리해 분석 모달과 섞이지 않게 해요.
+let settingsCloseTimer = null;
+// 한글 설명 주석: 중복 제출을 막고 요청 중 버튼/입력 상태를 한 번에 관리해요.
+let feedbackSubmitting = false;
 // 한글 설명 주석: 프로필 삭제 뒤에도 선택 창을 취소할 수 있는지 원래 상태를 기억해요.
 let profilePickerCanCancel = false;
 // 한글 설명 주석: 브라우저에서 사용할 수 있는 영어 음성을 찾아 전역에 보관해 재생마다 명시해요.
 let selectedEnglishVoice = null;
 // 한글 설명 주석: 자동 발음은 기본 켜짐이며, 저장된 문자열 값으로 다시 불러와요.
 let autoSoundEnabled = true;
+// 한글 설명 주석: 사용자 입력으로 오디오 컨텍스트를 깨우고, 음소거 시에는 같은 컨텍스트를 일시 중지해요.
+let audioContext = null;
+// 한글 설명 주석: 설치 안내를 한 번 닫았는지 기억해 초기 화면의 안내 노출 여부를 결정해요.
+let installGuideDismissed = false;
 
 // 한글 설명 주석: wordCatalog는 JSON 원본 단어를 보존해 사용자 전환 때 서로 다른 진도를 분리해요.
 let wordCatalog = [];
@@ -199,10 +245,23 @@ async function initializeApp() {
     // 한글 설명 주석: 공통 단어 사전을 보관하고, 선택된 학습자별 저장 데이터를 나중에 적용해요.
     wordCatalog = sourceWords.map(validateWord);
     configureDecks();
-    startButton.addEventListener("click", startLearning);
+    startButton.addEventListener("click", () => openBatchSizePicker("regular"));
     synonymMatchButton.addEventListener("click", startSynonymMatch);
     fillBlankButton.addEventListener("click", startFillBlankTraining);
     sessionLengthSelect.addEventListener("change", saveSessionLength);
+    // 한글 설명 주석: 안내를 닫으면 기기에 기억하고, 설정 창에서 다시 열 수 있어요.
+    installGuideCloseButton.addEventListener("click", dismissInstallGuide);
+    installGuideReopenButton.addEventListener("click", reopenInstallGuide);
+    // 한글 설명 주석: 설정 모달은 헤더, X, 닫기 버튼, 바깥 배경과 Escape 키로 제어해요.
+    settingsTriggerButton.addEventListener("click", openSettingsModal);
+    settingsBackdrop.addEventListener("click", closeSettingsModal);
+    settingsCloseButton.addEventListener("click", closeSettingsModal);
+    settingsDoneButton.addEventListener("click", closeSettingsModal);
+    document.addEventListener("keydown", handleSettingsModalKeydown);
+    settingsFeedbackForm.addEventListener("submit", handleFeedbackSubmit);
+    settingsFeedbackMessage.addEventListener("input", () => {
+      settingsFeedbackStatus.textContent = "";
+    });
     // 한글 설명 주석: 헤더 버튼과 서랍 바깥/닫기 버튼, Escape 키로 덱 선택 패널을 조작해요.
     deckTriggerButton.addEventListener("click", openDeckDrawer);
     deckDrawerBackdrop.addEventListener("click", closeDeckDrawer);
@@ -212,8 +271,14 @@ async function initializeApp() {
     sessionExitStayButton.addEventListener("click", dismissSessionExitWarning);
     sessionExitConfirmButton.addEventListener("click", confirmSessionExit);
     document.addEventListener("keydown", handleSessionExitKeydown, true);
+    // 한글 설명 주석: 분량 선택 창은 X/배경/Escape로 닫고 선택한 버튼에서 바로 세션을 시작해요.
+    batchSizeBackdrop.addEventListener("click", closeBatchSizePicker);
+    batchSizeCloseButton.addEventListener("click", closeBatchSizePicker);
+    document.addEventListener("keydown", handleBatchSizePickerKeydown);
     // 한글 설명 주석: 브랜드 클릭은 공통 세션 이탈 가드를 거쳐 대시보드로 이동해요.
     brandHomeButton.addEventListener("click", navigateHome);
+    // 한글 설명 주석: 집중 화면의 닫기 버튼도 브랜드 이동과 같은 세션 이탈 확인 흐름을 사용해요.
+    focusExitButton.addEventListener("click", navigateHome);
     // 한글 설명 주석: 분석 모달은 헤더 버튼, 배경, 닫기 버튼, ESC 키로 열고 닫아요.
     analyticsTriggerButton.addEventListener("click", openAnalyticsModal);
     analyticsBackdrop.addEventListener("click", closeAnalyticsModal);
@@ -225,7 +290,7 @@ async function initializeApp() {
     backupFileInput.addEventListener("change", handleBackupFileSelection);
     soundToggleButton.addEventListener("click", toggleAutoSound);
     reviewMistakesButton.addEventListener("click", renderMistakeReview);
-    studyExtraButton.addEventListener("click", startExtraLearning);
+    studyExtraButton.addEventListener("click", () => openBatchSizePicker("extra"));
     reviewTodayWordsButton.addEventListener("click", renderTodaySessionReview);
     reviewMasteredDeckButton.addEventListener("click", renderDeckReview);
     roadmapAllButton.addEventListener("click", () => selectRoadmapDeck("all"));
@@ -233,6 +298,7 @@ async function initializeApp() {
     switchProfileButton.addEventListener("click", () => {
       requestSessionExit(() => {
         clearQuizAutoAdvanceTimer();
+        closeSettingsModal(false);
         renderWelcome();
         showProfilePicker(true);
       });
@@ -242,6 +308,8 @@ async function initializeApp() {
 
     // 한글 설명 주석: 저장된 소리 설정을 읽되 저장 공간 오류는 사용자에게 알리고 기본값으로 계속 진행해요.
     loadAutoSoundPreference();
+    // 한글 설명 주석: 설치 상태와 이전 닫힘 기록을 읽어 배너 노출을 결정해요.
+    loadInstallGuidePreference();
 
     // 한글 설명 주석: 이전 방문 때 사용한 프로필이 유효하면 바로 대시보드로 이동하고, 아니면 선택 화면을 열어요.
     userProfiles = readUserProfiles();
@@ -513,7 +581,7 @@ function loadProgress() {
     activeDates: Array.isArray(parsedProgress.activeDates)
       ? parsedProgress.activeDates.filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date))
       : [],
-    sessionLength: [10, 15, 25].includes(parsedProgress.sessionLength) ? parsedProgress.sessionLength : 15,
+    sessionLength: SESSION_LENGTH_OPTIONS.includes(parsedProgress.sessionLength) ? parsedProgress.sessionLength : 15,
     mistakeDate: canRestoreWordProgress && parsedProgress.mistakeDate === getLocalDateKey() ? parsedProgress.mistakeDate : getLocalDateKey(),
     todayMistakes: canRestoreWordProgress && parsedProgress.mistakeDate === getLocalDateKey() && Array.isArray(parsedProgress.todayMistakes)
       ? parsedProgress.todayMistakes.filter((id) => Number.isInteger(id))
@@ -676,7 +744,7 @@ function validateProgressBackup(backup) {
       !Array.isArray(progress.todaySessionWords) ||
       !progress.todaySessionWords.every((id) => Number.isInteger(id) && validWordIds.has(String(id))) ||
       !validDate(progress.mistakeDate) || !validDate(progress.sessionDate) ||
-      ![10, 15, 25].includes(progress.sessionLength) ||
+      !SESSION_LENGTH_OPTIONS.includes(progress.sessionLength) ||
       !DECK_VALUES.includes(progress.currentDeck)) {
     throw new Error("백업의 날짜, 세션 설정 또는 학습 이력 형식이 올바르지 않아요.");
   }
@@ -809,12 +877,23 @@ function renderDashboard() {
   reviewMistakesButton.disabled = mistakeCount === 0 || studyControlsLocked;
   reviewTodayWordsButton.disabled = todayWordsCount === 0 || studyControlsLocked;
   reviewMasteredDeckButton.disabled = !allDeckWordsMastered || studyControlsLocked;
+  installGuideReopenButton.hidden = isStandaloneApp() || !installGuideDismissed;
 }
 
 // 한글 설명 주석: 세션 중에는 새 학습 동작만 잠그고 덱 버튼은 이탈 확인을 거쳐 전환할 수 있게 열어 둬요.
 function setStudyControlsLocked(isLocked) {
   studyControlsLocked = isLocked;
   deckTriggerButton.disabled = false;
+  // 한글 설명 주석: 학습/진단 화면에 들어갈 때만 대시보드 요소를 숨기고 닫기 버튼을 보여줘요.
+  document.body.classList.toggle("focus-mode", isLocked);
+  if (isLocked) {
+    focusToolbar.hidden = false;
+    focusToolbar.insertBefore(soundToggleButton, focusExitButton);
+  } else {
+    soundTogglePlaceholder.before(soundToggleButton);
+    focusToolbar.hidden = true;
+  }
+  focusExitButton.hidden = !isLocked;
   renderDashboard();
 }
 
@@ -851,11 +930,12 @@ function requestSessionExit(onConfirm) {
 // 한글 설명 주석: 홈 이동도 공통 세션 가드를 사용해 진행 중인 학습을 실수로 잃지 않게 해요.
 function navigateHome() {
   requestSessionExit(() => {
-    clearQuizAutoAdvanceTimer();
-    levelTestState = null;
-    synonymMatchRound = null;
-    fillBlankRound = null;
+    clearCurrentStudySession();
+    if (studyControlsLocked) {
+      setStudyControlsLocked(false);
+    }
     renderWelcome();
+    startButton.focus({ preventScroll: true });
   });
 }
 
@@ -873,14 +953,8 @@ function dismissSessionExitWarning() {
   sessionExitReturnFocus = null;
 }
 
-// 한글 설명 주석: 나가기를 확인하면 임시 퀴즈 상태와 타이머를 폐기한 뒤 요청한 화면으로 이동해요.
-function confirmSessionExit() {
-  const onConfirm = pendingSessionExitAction;
-  dismissSessionExitWarning();
-  if (!onConfirm) {
-    return;
-  }
-
+// 한글 설명 주석: 세션을 끝낼 때 플래시카드/퀴즈/진단의 임시 큐와 타이머를 한곳에서 초기화해요.
+function clearCurrentStudySession() {
   activeStudySession = false;
   clearQuizAutoAdvanceTimer();
   clearModeTransitionTimer();
@@ -896,6 +970,17 @@ function confirmSessionExit() {
   phaseByWordId = new Map();
   retryWordIds = new Set();
   sessionMode = "regular";
+}
+
+// 한글 설명 주석: 나가기를 확인하면 임시 퀴즈 상태와 타이머를 폐기한 뒤 요청한 화면으로 이동해요.
+function confirmSessionExit() {
+  const onConfirm = pendingSessionExitAction;
+  dismissSessionExitWarning();
+  if (!onConfirm) {
+    return;
+  }
+
+  clearCurrentStudySession();
   setStudyControlsLocked(false);
   onConfirm();
 }
@@ -1049,6 +1134,147 @@ function handleAnalyticsModalKeydown(event) {
   }
 }
 
+// 한글 설명 주석: 설정을 열 때 최신 상태를 반영하고 닫기 버튼으로 키보드 포커스를 옮겨요.
+function openSettingsModal() {
+  if (studyControlsLocked || settingsTriggerButton.disabled) {
+    return;
+  }
+
+  if (settingsCloseTimer !== null) {
+    window.clearTimeout(settingsCloseTimer);
+    settingsCloseTimer = null;
+  }
+  renderDashboard();
+  settingsOverlay.hidden = false;
+  settingsOverlay.setAttribute("aria-hidden", "false");
+  settingsTriggerButton.setAttribute("aria-expanded", "true");
+  document.body.classList.add("settings-open");
+  settingsOverlay.classList.add("is-open");
+  settingsCloseButton.focus({ preventScroll: true });
+}
+
+// 한글 설명 주석: 닫힘 애니메이션 후 설정을 숨기고, 필요한 경우 헤더의 설정 버튼으로 포커스를 돌려요.
+function closeSettingsModal(restoreFocus = true) {
+  if (settingsOverlay.hidden) {
+    return;
+  }
+
+  settingsOverlay.classList.remove("is-open");
+  settingsOverlay.setAttribute("aria-hidden", "true");
+  settingsTriggerButton.setAttribute("aria-expanded", "false");
+  document.body.classList.remove("settings-open");
+  if (settingsCloseTimer !== null) {
+    window.clearTimeout(settingsCloseTimer);
+  }
+  settingsCloseTimer = window.setTimeout(() => {
+    settingsOverlay.hidden = true;
+    settingsCloseTimer = null;
+  }, 250);
+  if (restoreFocus) {
+    settingsTriggerButton.focus({ preventScroll: true });
+  }
+}
+
+// 한글 설명 주석: Escape는 모달을 닫고, Tab 키는 포커스가 설정 창 바깥으로 빠져나가지 않게 해요.
+function handleSettingsModalKeydown(event) {
+  if (settingsOverlay.hidden) {
+    return;
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeSettingsModal();
+    return;
+  }
+  if (event.key !== "Tab") {
+    return;
+  }
+
+  const focusableElements = [...settingsDialog.querySelectorAll(
+    'button:not(:disabled), input:not(:disabled):not([type="file"]), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])'
+  )].filter((element) => !element.hidden && element.getClientRects().length > 0);
+  if (focusableElements.length === 0) {
+    event.preventDefault();
+    settingsDialog.focus();
+    return;
+  }
+
+  const firstElement = focusableElements[0];
+  const lastElement = focusableElements[focusableElements.length - 1];
+  if (event.shiftKey && document.activeElement === firstElement) {
+    event.preventDefault();
+    lastElement.focus();
+  } else if (!event.shiftKey && document.activeElement === lastElement) {
+    event.preventDefault();
+    firstElement.focus();
+  }
+}
+
+// 한글 설명 주석: 사용자의 동의를 받은 의견만 Web3Forms로 보내고 서버가 성공을 확인한 뒤 입력을 비워요.
+async function handleFeedbackSubmit(event) {
+  event.preventDefault();
+  if (feedbackSubmitting) {
+    return;
+  }
+
+  const feedback = settingsFeedbackMessage.value.trim();
+  const accessKey = web3FormsAccessKeyInput.value.trim();
+  if (!feedback) {
+    settingsFeedbackStatus.textContent = "의견을 입력한 뒤 보내 주세요.";
+    settingsFeedbackMessage.focus();
+    return;
+  }
+
+  if (!accessKey || accessKey === "YOUR_WEB3FORMS_ACCESS_KEY") {
+    settingsFeedbackStatus.textContent = "아직 의견 전송을 설정하지 않았어요. idjin1009@gmail.com에 연결된 Web3Forms access key를 등록해 주세요.";
+    return;
+  }
+
+  feedbackSubmitting = true;
+  const submitButton = settingsFeedbackForm.querySelector('button[type="submit"]');
+  const originalButtonLabel = submitButton.textContent;
+  settingsFeedbackForm.setAttribute("aria-busy", "true");
+  settingsFeedbackMessage.disabled = true;
+  submitButton.disabled = true;
+  submitButton.textContent = "전송 중...";
+  settingsFeedbackStatus.textContent = "의견을 전송하고 있어요...";
+
+  try {
+    // 한글 설명 주석: Web3Forms는 access_key에 연결된 수신 주소로 제목과 메시지를 이메일 전달해요.
+    const response = await fetch(WEB3FORMS_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify({
+        access_key: accessKey,
+        subject: "[Voca Impulse] 새로운 사용자 피드백",
+        from_name: "Voca Impulse 사용자",
+        message: feedback
+      })
+    });
+
+    const result = await response.json();
+    if (!response.ok || result.success !== true) {
+      throw new Error(typeof result.message === "string"
+        ? result.message
+        : `Web3Forms 요청에 실패했어요 (HTTP ${response.status}).`);
+    }
+
+    settingsFeedbackMessage.value = "";
+    settingsFeedbackStatus.textContent = "소중한 의견이 개발자에게 전송되었습니다! 감사합니다.";
+  } catch (error) {
+    console.error("Web3Forms feedback submission failed:", error);
+    settingsFeedbackStatus.textContent = "의견을 전송하지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.";
+  } finally {
+    feedbackSubmitting = false;
+    settingsFeedbackForm.removeAttribute("aria-busy");
+    settingsFeedbackMessage.disabled = false;
+    submitButton.disabled = false;
+    submitButton.textContent = originalButtonLabel;
+  }
+}
+
 // 한글 설명 주석: 마스터한 Day의 모든 단어를 SRS 변경 없이 참고 카드로 순서대로 복습해요.
 function renderDeckReview() {
   const deckWords = getCurrentDeckWords();
@@ -1057,6 +1283,8 @@ function renderDeckReview() {
     return;
   }
 
+  // 한글 설명 주석: 덱 다시보기는 읽기 전용 카드이므로 대시보드 이동 확인을 띄우지 않아요.
+  activeStudySession = false;
   setStudyControlsLocked(true);
   const reviewIndex = { current: 0 };
   const renderCard = () => {
@@ -1209,32 +1437,128 @@ function calculateDailyStreak(activeDates) {
   return streak;
 }
 
-// 한글 설명 주석: 설정 드롭다운에서 선택한 단어 수(10/15/25)를 학습 이력과 함께 저장해요.
+// 한글 설명 주석: 설정 드롭다운에서 선택한 세션 단어 수를 검증하고 학습 이력과 함께 저장해요.
 function saveSessionLength() {
-  history.sessionLength = Number(sessionLengthSelect.value);
+  const selectedLength = Number(sessionLengthSelect.value);
+  if (!SESSION_LENGTH_OPTIONS.includes(selectedLength)) {
+    sessionLengthSelect.value = String(history.sessionLength);
+    return;
+  }
+  history.sessionLength = selectedLength;
   saveProgress();
 }
 
-// 한글 설명 주석: 아직 배우지 않은 단어와 복습일이 도래한 단어만 선택해 세션을 시작해요.
-function startLearning() {
+// 한글 설명 주석: 오늘 복습 대상과 새 단어를 같은 규칙으로 모아 선택한 세션 크기만큼 정확히 잘라요.
+function getAvailableLearningWords() {
   // 한글 설명 주석: 오늘보다 복습일이 같거나 이른 단어와 상태 0 단어가 세션 후보예요.
   const today = getLocalDateKey();
-  // 한글 설명 주석: 오래 기다린 복습을 우선하고, 선택한 10/15/25개 단어를 최대 세션 크기로 사용해요.
-  const availableWords = getCurrentDeckWords()
+  // 한글 설명 주석: 오래 기다린 복습을 우선해 정렬하면 선택한 세션 크기를 먼저 오래된 복습에 써요.
+  return getCurrentDeckWords()
     .filter((word) => word.status === 0 || (word.dueDate && word.dueDate <= today))
     .sort((first, second) => {
       const firstDueDate = first.dueDate || "0000-00-00";
       const secondDueDate = second.dueDate || "0000-00-00";
       return firstDueDate.localeCompare(secondDueDate) || first.id - second.id;
-    })
-    .slice(0, history.sessionLength);
+    });
+}
 
+// 한글 설명 주석: 사용자가 선택한 분량을 적용해 해당 크기 이하로 오늘 학습 세션을 구성해요.
+function startLearning(sessionLength = history.sessionLength) {
+  const availableWords = getAvailableLearningWords().slice(0, sessionLength);
   if (availableWords.length === 0) {
     renderNoWordsAvailable();
     return;
   }
 
   startSession(availableWords, "regular");
+}
+
+// 한글 설명 주석: 시작 직전에 원하는 분량을 고르게 해 설정값을 따르거나 이번 세션만 더 길게 공부할 수 있어요.
+function openBatchSizePicker(mode) {
+  batchSizeSelectionMode = mode === "extra" ? "extra" : "regular";
+  batchSizeReturnFocus = document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : null;
+  const isExtraSession = batchSizeSelectionMode === "extra";
+  const candidateCount = isExtraSession
+    ? getCurrentDeckWords().filter((word) => word.status === 0).length
+    : getAvailableLearningWords().length;
+  batchSizeTitle.textContent = isExtraSession ? "추가로 공부할 단어 수" : "오늘 학습 단어 수";
+  batchSizeDescription.textContent = isExtraSession
+    ? "미학습 단어 중 원하는 만큼 골라 이어서 공부해 보세요."
+    : "복습 예정 단어와 새 단어를 선택한 분량만큼 공부해요.";
+  batchSizeAvailability.textContent = `현재 선택한 덱에서 ${candidateCount.toLocaleString("ko-KR")}개를 학습할 수 있어요.`;
+  batchSizeOptions.replaceChildren();
+
+  SESSION_LENGTH_OPTIONS.forEach((length) => {
+    const isSelected = !isExtraSession && length === history.sessionLength;
+    const option = createElement(
+      "button",
+      `batch-size-option${isSelected ? " is-selected" : ""}`,
+      `${isExtraSession ? "+" : ""}${length}단어`
+    );
+    option.type = "button";
+    option.setAttribute("aria-pressed", String(isSelected));
+    option.addEventListener("click", () => {
+      closeBatchSizePicker(false);
+      if (isExtraSession) {
+        startExtraLearning(length);
+        return;
+      }
+
+      history.sessionLength = length;
+      sessionLengthSelect.value = String(length);
+      saveProgress();
+      startLearning(length);
+    });
+    batchSizeOptions.append(option);
+  });
+
+  batchSizeOverlay.hidden = false;
+  batchSizeOverlay.setAttribute("aria-hidden", "false");
+  batchSizeDialog.focus({ preventScroll: true });
+}
+
+// 한글 설명 주석: 분량 선택을 취소하면 이전 화면에 머물고, 시작하면 새 학습 화면으로 자연스럽게 이동해요.
+function closeBatchSizePicker(restoreFocus = true) {
+  if (batchSizeOverlay.hidden) {
+    return;
+  }
+  batchSizeOverlay.hidden = true;
+  batchSizeOverlay.setAttribute("aria-hidden", "true");
+  if (restoreFocus && batchSizeReturnFocus?.isConnected) {
+    batchSizeReturnFocus.focus({ preventScroll: true });
+  }
+  batchSizeReturnFocus = null;
+}
+
+// 한글 설명 주석: Escape로 분량 선택을 닫고 Tab 포커스가 모달 바깥으로 빠져나가지 않게 해요.
+function handleBatchSizePickerKeydown(event) {
+  if (batchSizeOverlay.hidden) {
+    return;
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeBatchSizePicker();
+    return;
+  }
+  if (event.key !== "Tab") {
+    return;
+  }
+
+  const focusableElements = [...batchSizeDialog.querySelectorAll("button:not(:disabled)")];
+  const firstElement = focusableElements[0];
+  const lastElement = focusableElements[focusableElements.length - 1];
+  if (document.activeElement === batchSizeDialog) {
+    event.preventDefault();
+    (event.shiftKey ? lastElement : firstElement).focus();
+  } else if (event.shiftKey && document.activeElement === firstElement) {
+    event.preventDefault();
+    lastElement.focus();
+  } else if (!event.shiftKey && document.activeElement === lastElement) {
+    event.preventDefault();
+    firstElement.focus();
+  }
 }
 
 // 한글 설명 주석: 진단 시작 전 목표 문항 수와 예상 시간을 안내하고 테스트 진입/취소를 제공해요.
@@ -1461,7 +1785,8 @@ function exitLevelTest() {
 // 한글 설명 주석: 일반 학습과 추가 학습이 공유하는 세션 상태를 초기화하고 플래시카드로 이동해요.
 function startSession(sessionWords, mode) {
   clearQuizAutoAdvanceTimer();
-  activeStudySession = true;
+  // 한글 설명 주석: 플래시카드는 답을 제출하기 전 단계라 종료 경고 없이 나갈 수 있어요.
+  activeStudySession = false;
   // 한글 설명 주석: 무작위 문항 순서는 앞선 단어의 맥락이 다음 답을 미리 알려 주는 것을 줄여 장기 기억을 도와요.
   // 한글 설명 주석: Fisher–Yates 섞기는 새 배열을 반환하므로 원본 단어 사전/선택 순서와 ID는 바뀌지 않아요.
   currentSession = shuffle(sessionWords);
@@ -1485,9 +1810,11 @@ function startSession(sessionWords, mode) {
   renderFlashcard();
 }
 
-// 한글 설명 주석: 상태 0 단어 중 다음 10개를 골라 설정 문항 수와 관계없이 추가 미니 세션을 시작해요.
-function startExtraLearning() {
-  const extraWords = getCurrentDeckWords().filter((word) => word.status === 0).slice(0, 10);
+// 한글 설명 주석: 상태 0 단어 중 선택한 개수만큼 골라 추가 미니 세션을 시작해요.
+function startExtraLearning(batchSize = history.sessionLength) {
+  const extraWords = getCurrentDeckWords()
+    .filter((word) => word.status === 0)
+    .slice(0, batchSize);
   if (extraWords.length === 0) {
     renderNoWordsAvailable();
     return;
@@ -1711,12 +2038,42 @@ function startFillBlankTraining() {
   renderFillBlankQuestion();
 }
 
-// 한글 설명 주석: 정규식에 안전하게 이스케이프한 단어만 문장 속에서 찾아 첫 글자와 밑줄로 바꿔요.
+// 한글 설명 주석: 단어 길이에 따라 첫 1~3개 글자만 힌트로 남기고 나머지 알파벳을 정확한 수의 밑줄로 가려요.
 function maskWordInSentence(sentence, targetWord) {
   const escapedWord = escapeRegExp(targetWord);
   const targetPattern = new RegExp(`\\b${escapedWord}\\b`, "i");
-  const blank = `${targetWord[0]}${"_".repeat(Math.max(targetWord.length - 1, 3))}`;
+  const letterCount = (targetWord.match(/[a-z]/gi) || []).length;
+  const hintLength = letterCount <= 4 ? 1 : letterCount <= 7 ? 2 : 3;
+  let revealedLetters = 0;
+  const blank = [...targetWord].map((character) => {
+    if (!/[a-z]/i.test(character)) {
+      return character;
+    }
+    revealedLetters += 1;
+    return revealedLetters <= hintLength ? character : "_";
+  }).join("");
   return sentence.replace(targetPattern, blank);
+}
+
+// 한글 설명 주석: 생성형 예문 데이터의 어색한 뜻 풀이 템플릿을 타이핑 퀴즈에서 자연스럽게 다듬어요.
+function getFillBlankKoreanTranslation(word) {
+  const translation = word.exampleKo.trim();
+  const usesReportPhraseTemplate =
+    /^연구진은 보고서에서 ["“].+?["”]라는 표현이 .+?라는 의미로 쓰인 방식을 살펴보았다[.!?]?$/u;
+  if (usesReportPhraseTemplate.test(translation)) {
+    return `연구진은 보고서에서 ‘${word.meaning}’의 쓰임을 살펴보았다.`;
+  }
+
+  const usesAcademicExampleTemplate =
+    /^교재는 학술적 논증에서 .+?라는 의미로 쓰인 ["“].+?["”]의 예를 제시한다[.!?]?$/u;
+  if (usesAcademicExampleTemplate.test(translation)) {
+    return `교재는 학술적 논증에서 ‘${word.meaning}’의 예를 제시한다.`;
+  }
+
+  // 한글 설명 주석: 첫 문장 뒤에 자동으로 덧붙은 반복적인 단어 뜻 해설만 제거하고 원래 예문 해석은 보존해요.
+  const roboticExplanation = /\s*(?:(?:여기서|이 문장에서)\s*.+?(?:라는 뜻으로 쓰였다|라는 뜻으로 사용된다|라는 의미로 쓰였다|라는 의미로 사용된다|라는 의미를 나타낸다)|여기서 사용된 표현은 .+?라는 의미다|이 문맥의 핵심 동사는 .+?라는 뜻이다|이는 .+?에 해당하는 결정이었다|이 행동은 .+?라는 뜻과 연결된다|["“].+?["”](?:은|는)\s*.+?라는 의미를 나타낸다)[.!?]?$/u;
+  const cleanedTranslation = translation.replace(roboticExplanation, "").trim();
+  return cleanedTranslation || translation;
 }
 
 // 한글 설명 주석: 빈칸 예문과 뜻/번역 단서를 표시하고 Enter 또는 버튼 제출로 답을 확인해요.
@@ -1741,14 +2098,17 @@ function renderFillBlankQuestion() {
     createPronunciationButton(word.word, `${word.word} 발음 듣기`)
   );
 
-  // 한글 설명 주석: 타깃 단어는 첫 글자와 같은 길이의 밑줄로 가리고 문장 구조는 그대로 유지해요.
+  // 한글 설명 주석: 단어 길이별 첫 글자 힌트와 자연스럽게 정리한 한국어 예문 해석을 함께 보여줘요.
   const maskedExample = createElement("p", "example-en", maskWordInSentence(word.exampleEn, word.word));
   maskedExample.style.marginTop = "16px";
   const clues = createElement("div", "typing-context");
   const meaningClue = createElement("p", "typing-clue");
   meaningClue.append(createElement("strong", "", "뜻 힌트"), document.createTextNode(word.meaning));
   const translationClue = createElement("p", "typing-clue");
-  translationClue.append(createElement("strong", "", "예문 해석"), document.createTextNode(word.exampleKo));
+  translationClue.append(
+    createElement("strong", "", "예문 해석"),
+    document.createTextNode(getFillBlankKoreanTranslation(word))
+  );
   clues.append(meaningClue, translationClue);
 
   const form = createElement("form", "answer-row");
@@ -1959,6 +2319,8 @@ function startQuizRounds() {
     renderSummary();
     return;
   }
+  // 한글 설명 주석: 답변과 SRS 상태가 바뀌는 채점 단계부터 진행 중 세션 종료 확인을 활성화해요.
+  activeStudySession = true;
   currentRoundNumber = 1;
   currentRoundQueue = shuffle(currentSession);
   quizIndex = 0;
@@ -1982,6 +2344,8 @@ function renderMistakeReview() {
     return;
   }
 
+  // 한글 설명 주석: 오답 단어 참고 카드는 채점 전 복습이므로 즉시 대시보드로 돌아갈 수 있어요.
+  activeStudySession = false;
   setStudyControlsLocked(true);
   mistakeReviewIndex = Math.min(mistakeReviewIndex, mistakeWords.length - 1);
   const word = mistakeWords[mistakeReviewIndex];
@@ -2030,6 +2394,8 @@ function renderTodaySessionReview() {
     return;
   }
 
+  // 한글 설명 주석: 읽기 전용 다시보기는 답을 채점하거나 진도를 바꾸지 않으므로 종료 경고 대상이 아니에요.
+  activeStudySession = false;
   setStudyControlsLocked(true);
   const reviewIndex = { current: 0 };
   renderTodaySessionReviewCard(sessionWords, reviewIndex);
@@ -2092,8 +2458,8 @@ function initializeEnglishVoiceSelection() {
   window.speechSynthesis.onvoiceschanged = selectEnglishVoice;
 
   // 한글 설명 주석: 브라우저의 자동 재생 제한은 첫 사용자 입력에서 음성 엔진을 깨워야 풀릴 수 있어요.
-  document.addEventListener("pointerdown", unlockSpeechSynthesis, { once: true, capture: true });
-  document.addEventListener("keydown", unlockSpeechSynthesis, { once: true, capture: true });
+  document.addEventListener("pointerdown", unlockAudioOnInteraction, { capture: true });
+  document.addEventListener("keydown", unlockAudioOnInteraction, { capture: true });
 }
 
 // 한글 설명 주석: 고품질 미국 음성을 우선하고, en-US, 다른 영어 음성 순으로 캐시해요.
@@ -2117,7 +2483,7 @@ function selectEnglishVoice() {
 
 // 한글 설명 주석: 클릭이나 키보드 입력을 받은 순간 일시 정지된 합성 엔진을 깨워 자동 재생 제한을 풀어요.
 function unlockSpeechSynthesis() {
-  if (!("speechSynthesis" in window)) {
+  if (!autoSoundEnabled || !("speechSynthesis" in window)) {
     return;
   }
 
@@ -2127,6 +2493,67 @@ function unlockSpeechSynthesis() {
     console.error("TTS unlock error:", error);
     speechStatus.textContent = "음성 재생을 준비하지 못했어요. 버튼을 다시 눌러 주세요.";
   }
+}
+
+// 한글 설명 주석: iOS가 지원하면 재생 세션으로 지정해 무음 스위치 영향을 줄이고, 지원하지 않는 브라우저는 건너뛰어요.
+function configurePlaybackAudioSession() {
+  const audioSession = navigator.audioSession;
+  if (!audioSession || !("type" in audioSession)) {
+    return;
+  }
+
+  try {
+    audioSession.type = "playback";
+  } catch (error) {
+    console.warn("오디오 재생 세션을 설정하지 못했어요:", error);
+  }
+}
+
+// 한글 설명 주석: 실제 사용자 입력 안에서 AudioContext와 음성 엔진을 깨워 모바일 자동 재생 제한을 해제해요.
+function unlockAudioOnInteraction() {
+  if (!autoSoundEnabled) {
+    return;
+  }
+
+  configurePlaybackAudioSession();
+  const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+  if (AudioContextConstructor && !audioContext) {
+    try {
+      audioContext = new AudioContextConstructor();
+    } catch (error) {
+      console.error("오디오 컨텍스트를 만들지 못했어요:", error);
+      speechStatus.textContent = "기기에서 오디오를 준비하지 못했어요. 발음 버튼을 다시 눌러 주세요.";
+    }
+  }
+
+  if (audioContext && audioContext.state !== "running") {
+    audioContext.resume().catch((error) => {
+      console.error("오디오 컨텍스트를 활성화하지 못했어요:", error);
+      speechStatus.textContent = "기기에서 오디오를 활성화하지 못했어요. 다시 시도해 주세요.";
+    });
+  }
+  unlockSpeechSynthesis();
+}
+
+// 한글 설명 주석: 음소거를 선택하면 진행 중인 음성과 앱 오디오를 즉시 멈추고 스피커 버튼 상태도 복원해요.
+function stopAudioPlayback() {
+  if (activeSpeechButton) {
+    const defaultLabel = activeSpeechButton.dataset.defaultLabel;
+    activeSpeechButton.setAttribute("aria-label", defaultLabel);
+    activeSpeechButton.title = defaultLabel;
+    activeSpeechButton.setAttribute("aria-pressed", "false");
+    activeSpeechButton = null;
+  }
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+  if (audioContext && audioContext.state !== "closed" && audioContext.state !== "suspended") {
+    audioContext.suspend().catch((error) => {
+      console.error("오디오 컨텍스트를 음소거하지 못했어요:", error);
+      speechStatus.textContent = "오디오를 멈추지 못했어요. 페이지를 새로고침해 주세요.";
+    });
+  }
+  speechStatus.textContent = "";
 }
 
 // 한글 설명 주석: 한글, 괄호, 장식 기호를 걸러내고 영어 알파벳과 공백만 음성 엔진에 전달해요.
@@ -2168,11 +2595,17 @@ function createExampleAudioLine(example, targetWord) {
 
 // 한글 설명 주석: 영어 텍스트만 정리해 en-US 음성 객체를 지정한 뒤 브라우저 음성 엔진에 전달해요.
 function pronounceEnglish(text, button, defaultLabel) {
+  if (!autoSoundEnabled) {
+    speechStatus.textContent = "소리가 꺼져 있어요. 설정에서 소리를 켜 주세요.";
+    return;
+  }
   if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
     speechStatus.textContent = "이 브라우저에서는 음성 발음을 지원하지 않아요.";
     return;
   }
 
+  // 한글 설명 주석: 재생 전에 iOS 오디오 경로와 음성 엔진을 사용자 입력 상태에서 활성화해요.
+  unlockAudioOnInteraction();
   // 한글 설명 주석: 빠르게 여러 번 눌러도 음성이 겹치지 않도록 이전 재생을 중단하고 버튼 상태를 복구해요.
   if (activeSpeechButton) {
     activeSpeechButton.setAttribute("aria-label", activeSpeechButton.dataset.defaultLabel);
@@ -2590,6 +3023,9 @@ function loadAutoSoundPreference() {
     const savedPreference = localStorage.getItem(AUTO_SOUND_STORAGE_KEY);
     autoSoundEnabled = savedPreference === null || savedPreference === "true";
     updateSoundToggleButton();
+    if (!autoSoundEnabled) {
+      stopAudioPlayback();
+    }
   } catch (error) {
     showStorageWarning(error);
     updateSoundToggleButton();
@@ -2598,17 +3034,26 @@ function loadAutoSoundPreference() {
 
 // 한글 설명 주석: 버튼을 누르면 자동 발음 상태를 바꾸고 정확한 불리언 문자열을 브라우저에 저장해요.
 function toggleAutoSound() {
-  // 한글 설명 주석: 설정 버튼 자체가 첫 입력일 수 있으므로 음소거 여부와 관계없이 엔진을 먼저 깨워요.
-  unlockSpeechSynthesis();
   const previousPreference = autoSoundEnabled;
   autoSoundEnabled = !autoSoundEnabled;
   updateSoundToggleButton();
+  // 한글 설명 주석: 켜기는 현재 클릭 안에서 오디오를 깨우고, 끄기는 저장을 기다리지 않고 재생을 중단해요.
+  if (autoSoundEnabled) {
+    unlockAudioOnInteraction();
+  } else {
+    stopAudioPlayback();
+  }
 
   try {
     localStorage.setItem(AUTO_SOUND_STORAGE_KEY, String(autoSoundEnabled));
   } catch (error) {
     autoSoundEnabled = previousPreference;
     updateSoundToggleButton();
+    if (autoSoundEnabled) {
+      unlockAudioOnInteraction();
+    } else {
+      stopAudioPlayback();
+    }
     showStorageWarning(error);
   }
 }
@@ -2692,7 +3137,7 @@ function renderSummary() {
   const extraButton = createElement("button", "button", "추가 단어 공부하기");
   extraButton.type = "button";
   extraButton.disabled = getCurrentDeckWords().every((word) => word.status !== 0);
-  extraButton.addEventListener("click", startExtraLearning);
+  extraButton.addEventListener("click", () => openBatchSizePicker("extra"));
 
   const homeButton = createElement("button", "button", "대시보드로 돌아가기");
   homeButton.type = "button";
@@ -2749,6 +3194,8 @@ function renderWelcome() {
   clearQuizAutoAdvanceTimer();
   setStudyControlsLocked(false);
   appContent.replaceChildren();
+  // 한글 설명 주석: 대시보드 화면에서만 안내를 콘텐츠 맨 위에 붙이고, 집중/결과 화면에는 포함하지 않아요.
+  updateInstallGuideVisibility(true);
   const section = createElement("section", "study-cta-card");
   const selectedDeck = currentDeck === "all" ? "전체 단어장" : currentDeck;
   const deckCount = getCurrentDeckWords().length;
@@ -2762,6 +3209,68 @@ function renderWelcome() {
   actions.append(startButton, synonymMatchButton, fillBlankButton);
   section.append(copy, actions);
   appContent.append(section);
+}
+
+// 한글 설명 주석: 설치 상태, 저장된 닫힘 값, 현재 화면 종류를 합쳐 배너와 다시 보기 버튼을 제어해요.
+function updateInstallGuideVisibility(isDashboardVisible) {
+  const isInstalled = isStandaloneApp();
+  installGuideBanner.hidden = isInstalled || installGuideDismissed || !isDashboardVisible;
+  installGuideReopenButton.hidden = isInstalled || !installGuideDismissed;
+  if (isDashboardVisible && !installGuideBanner.hidden) {
+    appContent.prepend(installGuideBanner);
+  }
+}
+
+// 한글 설명 주석: iOS 홈 화면 실행과 표준 display-mode standalone 실행을 모두 설치 완료로 판단해요.
+function isStandaloneApp() {
+  const displayModeQuery = typeof window.matchMedia === "function"
+    ? window.matchMedia("(display-mode: standalone)").matches
+    : false;
+  return navigator.standalone === true || displayModeQuery;
+}
+
+// 한글 설명 주석: 배너를 다시 표시할지 판단하기 위해 기기 전체에 저장된 닫힘 상태를 읽어요.
+function loadInstallGuidePreference() {
+  try {
+    installGuideDismissed = localStorage.getItem(INSTALL_GUIDE_STORAGE_KEY) === "true";
+    updateInstallGuideVisibility(false);
+  } catch (error) {
+    console.error("홈 화면 설치 안내 설정을 읽지 못했어요:", error);
+    installGuideDismissed = false;
+    updateInstallGuideVisibility(false);
+    showStorageWarning(error);
+  }
+}
+
+// 한글 설명 주석: 닫기 선택은 저장한 뒤 대시보드를 다시 그려 이후 방문에도 배너를 숨겨요.
+function dismissInstallGuide() {
+  const previousDismissedState = installGuideDismissed;
+  installGuideDismissed = true;
+  try {
+    localStorage.setItem(INSTALL_GUIDE_STORAGE_KEY, "true");
+  } catch (error) {
+    installGuideDismissed = previousDismissedState;
+    updateInstallGuideVisibility(true);
+    showStorageWarning(error);
+    return;
+  }
+  renderWelcome();
+}
+
+// 한글 설명 주석: 설정에서 다시 보기 누르면 저장된 닫힘 값을 지우고 설치 안내 배너를 대시보드에 표시해요.
+function reopenInstallGuide() {
+  const previousDismissedState = installGuideDismissed;
+  installGuideDismissed = false;
+  try {
+    localStorage.removeItem(INSTALL_GUIDE_STORAGE_KEY);
+  } catch (error) {
+    installGuideDismissed = previousDismissedState;
+    updateInstallGuideVisibility(true);
+    showStorageWarning(error);
+    return;
+  }
+  renderWelcome();
+  closeSettingsModal(false);
 }
 
 // 한글 설명 주석: 플래시카드와 퀴즈에서 공유하는 단계 제목, 현재 번호, 진행 막대를 만들어요.

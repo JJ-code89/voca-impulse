@@ -351,8 +351,8 @@
         <button class="deck-trigger-button" id="deck-trigger-button" type="button" aria-haspopup="dialog" aria-controls="deck-drawer-overlay" aria-expanded="false">📑 덱: 전체 단어장 ▾</button>
         <!-- 한국어 설명: 전체 숙련도와 Day별 로드맵은 별도 분석 창에서 확인해요. -->
         <button class="analytics-trigger-button" id="analytics-trigger-button" type="button" aria-haspopup="dialog" aria-controls="analytics-overlay" aria-expanded="false">📊 학습 분석 &amp; 로드맵</button>
-        <!-- 한국어 설명: 첫 사용자 입력에서 음성 엔진을 깨우며 상태 안내는 아래 발음 안내 영역에 표시해요. -->
-        <button class="sound-toggle-button" id="sound-toggle-button" type="button" aria-pressed="true" aria-controls="speech-status" title="자동 발음 켜짐">🔊 소리 켜짐</button>
+        <!-- 한국어 설명: 오디오, 학습량, 계정 데이터와 피드백을 한 설정 창에서 관리해요. -->
+        <button class="settings-trigger-button" id="settings-trigger-button" type="button" aria-haspopup="dialog" aria-controls="settings-overlay" aria-expanded="false">⚙️ 설정</button>
       </div>
     </header>
 
@@ -416,9 +416,134 @@
       </section>
     </div>
 
+    <!-- 한국어 설명: 자주 쓰지 않는 환경 설정과 데이터 도구, 사용자 의견 입력을 모달 하나에 모아요. -->
+    <div class="analytics-overlay settings-overlay" id="settings-overlay" aria-hidden="true" hidden>
+      <button class="analytics-backdrop" id="settings-backdrop" type="button" aria-label="설정 창 닫기"></button>
+      <section class="analytics-dialog settings-dialog" id="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title" tabindex="-1">
+        <header class="analytics-modal-header">
+          <div>
+            <p class="eyebrow">APP PREFERENCES</p>
+            <h2 id="settings-title">⚙️ 설정</h2>
+            <p>학습 환경과 데이터, 의견을 한곳에서 관리해요.</p>
+          </div>
+          <button class="analytics-close-button" id="settings-close-button" type="button" aria-label="설정 창 닫기">✕</button>
+        </header>
+        <div class="analytics-modal-content settings-modal-content" id="settings-modal-content">
+          <section class="settings-section" aria-labelledby="settings-audio-title">
+            <div class="settings-section-heading">
+              <span class="settings-section-icon" aria-hidden="true">🔊</span>
+              <div>
+                <h3 id="settings-audio-title">오디오 설정</h3>
+                <p>단어와 예문의 영어 발음을 재생해요.</p>
+              </div>
+            </div>
+            <div class="settings-option-row">
+              <div class="settings-option-copy">
+                <strong>발음 소리</strong>
+                <span>학습 중 자동 발음과 스피커 버튼을 설정해요.</span>
+              </div>
+              <span id="settings-sound-placeholder"></span>
+              <button class="sound-toggle-button" id="sound-toggle-button" type="button" aria-pressed="true" aria-controls="speech-status" title="자동 발음 켜짐">🔊 소리 켜짐</button>
+            </div>
+          </section>
+
+          <section class="settings-section" aria-labelledby="settings-study-title">
+            <div class="settings-section-heading">
+              <span class="settings-section-icon" aria-hidden="true">📚</span>
+              <div>
+                <h3 id="settings-study-title">학습 환경 설정</h3>
+                <p>한 번에 공부할 단어 수를 정해 보세요.</p>
+              </div>
+            </div>
+            <label class="settings-session-select" for="session-length">
+              <span>1회 학습 단어 수</span>
+              <select id="session-length">
+                <option value="10">10단어 (퀴즈 30문항)</option>
+                <option value="15" selected>15단어 (퀴즈 45문항)</option>
+                <option value="20">20단어 (퀴즈 60문항)</option>
+                <option value="25">25단어 (퀴즈 75문항)</option>
+                <option value="30">30단어 (퀴즈 90문항)</option>
+                <option value="50">50단어 (퀴즈 150문항)</option>
+              </select>
+            </label>
+          </section>
+
+          <section class="settings-section settings-data-section" aria-labelledby="settings-data-title">
+            <div class="settings-section-heading">
+              <span class="settings-section-icon" aria-hidden="true">🗂️</span>
+              <div>
+                <h3 id="settings-data-title">데이터 &amp; 계정</h3>
+                <p>프로필을 전환하거나 학습 기록을 백업할 수 있어요.</p>
+              </div>
+            </div>
+            <div class="action-pod data-pod settings-data-pod">
+              <div class="pod-actions tertiary-actions">
+                <button class="button tertiary-action" id="backup-export-button" type="button">💾 학습 기록 백업 (JSON 다운로드)</button>
+                <button class="button tertiary-action" id="backup-import-button" type="button">📂 학습 기록 불러오기</button>
+                <button class="button tertiary-action profile-switch-button" id="switch-profile-button" type="button">👤 프로필 전환</button>
+                <button class="button tertiary-action" id="install-guide-reopen-button" type="button" hidden>📱 홈 화면 설치 안내 다시 보기</button>
+                <input id="backup-file-input" type="file" accept=".json,application/json" hidden>
+              </div>
+              <p class="backup-status" id="backup-status" role="status" aria-live="polite"></p>
+              <p class="pod-note">백업에는 현재 프로필의 기기 내 학습 기록이 포함돼요.</p>
+            </div>
+          </section>
+
+          <section class="settings-section feedback-section" aria-labelledby="settings-feedback-title">
+            <div class="settings-section-heading">
+              <span class="settings-section-icon" aria-hidden="true">💌</span>
+              <div>
+                <h3 id="settings-feedback-title">개발자에게 한마디</h3>
+                <p>사용 후기나 개선 의견을 자유롭게 적어 주세요.</p>
+              </div>
+            </div>
+            <form id="settings-feedback-form" class="feedback-form">
+              <!-- 한글 설명 주석: 이 값을 idjin1009@gmail.com에 연결해 발급한 Web3Forms 키로 교체해 주세요. -->
+              <input id="web3forms-access-key" type="hidden" name="access_key" value="YOUR_WEB3FORMS_ACCESS_KEY">
+              <label class="visually-hidden" for="settings-feedback-message">후기 및 개선 의견</label>
+              <textarea id="settings-feedback-message" name="message" rows="4" maxlength="2000" placeholder="사용하면서 좋았던 점이나 바라는 기능을 알려 주세요." required></textarea>
+              <p class="feedback-privacy-note">의견을 보내면 Web3Forms를 통해 idjin1009@gmail.com으로 전달돼요. 실제 전송을 위해 해당 이메일에 연결된 Web3Forms access key 설정이 필요해요.</p>
+              <div class="feedback-submit-row">
+                <p class="feedback-status" id="settings-feedback-status" role="status" aria-live="polite"></p>
+                <button class="button feedback-submit-button" type="submit">의견 보내기</button>
+              </div>
+            </form>
+          </section>
+        </div>
+        <footer class="analytics-modal-footer settings-modal-footer">
+          <button class="button secondary" id="settings-done-button" type="button">닫기</button>
+        </footer>
+      </section>
+    </div>
+
     <!-- 한국어 설명: 선택한 덱의 플래시카드, 퀴즈, 결과와 퀵 액션 화면을 보여줘요. -->
     <main class="panel main-panel" id="main-container" aria-live="polite" aria-atomic="true">
+      <!-- 한국어 설명: 학습 중에는 화면 오른쪽 위에 이탈 확인을 여는 닫기 버튼만 표시해요. -->
+      <div class="focus-toolbar" id="focus-toolbar" hidden>
+        <button class="focus-exit-button" id="focus-exit-button" type="button" aria-label="학습 종료 확인" title="학습 종료 확인" hidden>✕</button>
+      </div>
       <div class="panel-content" id="app-content">
+        <!-- 한국어 설명: 모바일에서 홈 화면 설치 방법을 안내하고, 닫으면 설정에서 다시 열 수 있어요. -->
+        <section class="install-guide-banner" id="install-guide-banner" aria-labelledby="install-guide-title" hidden>
+          <div class="install-guide-heading">
+            <h2 id="install-guide-title">📱 스마트폰 홈 화면에 추가하고 앱처럼 사용해 보세요!</h2>
+            <button class="install-guide-close" id="install-guide-close" type="button" aria-label="홈 화면 설치 안내 닫기">✕ 닫기</button>
+          </div>
+          <ol class="install-guide-steps">
+            <li>
+              <span class="install-guide-step-number">1</span>
+              <p>Safari 하단 <strong>‘공유’</strong> 버튼 (네모 위 화살표 아이콘) 터치<br><span>안드로이드는 우측 상단 메뉴 ⋮</span></p>
+            </li>
+            <li>
+              <span class="install-guide-step-number">2</span>
+              <p>메뉴에서 <strong>‘홈 화면에 추가’</strong> (+) 선택</p>
+            </li>
+            <li>
+              <span class="install-guide-step-number">3</span>
+              <p>우측 상단 <strong>‘추가’</strong>를 누르면 바탕화면에 VIP 앱 설치 완료!</p>
+            </li>
+          </ol>
+        </section>
         <section class="study-cta-card" aria-label="핵심 학습">
           <div class="study-cta-copy">
             <p class="eyebrow">CORE TRAINING</p>
@@ -433,23 +558,7 @@
       </div>
     </main>
 
-    <!-- 한국어 설명: 단어 수 설정은 핵심 시작 버튼 아래에 배치해 첫 화면의 학습 진입을 우선해요. -->
-    <section class="control-row" aria-label="학습 설정">
-      <div class="control-copy">
-        <h2>나에게 맞는 학습량</h2>
-        <p>단어 수를 선택해 주세요. 한 단어마다 세 가지 방식으로 퀴즈를 풀어요.</p>
-      </div>
-      <label class="select-wrap" for="session-length">
-        <span>세션 단어 수</span>
-        <select id="session-length">
-          <option value="10">10단어 (퀴즈 30문항)</option>
-          <option value="15" selected>15단어 (퀴즈 45문항)</option>
-          <option value="25">25단어 (퀴즈 75문항)</option>
-        </select>
-      </label>
-    </section>
-
-    <!-- 한국어 설명: 복습·진단과 데이터·설정 도구를 각각 독립된 Pod로 묶어요. -->
+    <!-- 한국어 설명: 첫 화면에는 복습/진단처럼 자주 쓰는 핵심 공부 도구만 남겨 시선을 정리해요. -->
     <section class="quick-action-hub" aria-labelledby="quick-action-title">
       <div class="quick-action-heading">
         <div>
@@ -458,7 +567,7 @@
         </div>
         <span class="selected-deck-label" id="selected-deck-label">전체 단어장 · 1,500개 단어</span>
       </div>
-      <div class="action-pods">
+      <div class="action-pods review-actions-only">
         <section class="action-pod review-pod" aria-labelledby="review-pod-title">
           <div class="action-pod-heading">
             <span class="action-pod-icon" aria-hidden="true">🎯</span>
@@ -471,20 +580,6 @@
             <button class="button secondary secondary-study-button hidden" id="review-mastered-deck-button" type="button">선택한 덱 전체 다시보기</button>
             <button class="button secondary secondary-study-button" id="study-extra-button" type="button">추가 단어 공부하기</button>
           </div>
-        </section>
-        <section class="action-pod data-pod" aria-labelledby="data-pod-title">
-          <div class="action-pod-heading">
-            <span class="action-pod-icon" aria-hidden="true">⚙️</span>
-            <h3 id="data-pod-title">데이터 &amp; 설정</h3>
-          </div>
-          <div class="pod-actions tertiary-actions">
-            <button class="button tertiary-action" id="backup-export-button" type="button">💾 학습 기록 백업 (JSON)</button>
-            <button class="button tertiary-action" id="backup-import-button" type="button">📂 기록 불러오기</button>
-            <button class="button tertiary-action profile-switch-button" id="switch-profile-button" type="button">👤 프로필 전환</button>
-            <input id="backup-file-input" type="file" accept=".json,application/json" hidden>
-          </div>
-          <p class="backup-status" id="backup-status" role="status" aria-live="polite"></p>
-          <p class="pod-note">백업에는 현재 프로필의 기기 내 학습 기록이 포함돼요.</p>
         </section>
       </div>
     </section>
@@ -523,6 +618,22 @@
           <button class="button" type="submit">이 이름으로 시작하기</button>
         </div>
       </form>
+    </section>
+  </div>
+  <!-- 한글 설명 주석: 오늘 학습/추가 학습을 시작하기 전에 원하는 단어 수를 빠르게 고르는 모달이에요. -->
+  <div class="batch-size-overlay" id="batch-size-overlay" aria-hidden="true" hidden>
+    <button class="batch-size-backdrop" id="batch-size-backdrop" type="button" tabindex="-1" aria-label="단어 수 선택 창 닫기"></button>
+    <section class="batch-size-dialog" id="batch-size-dialog" role="dialog" aria-modal="true" aria-labelledby="batch-size-title" aria-describedby="batch-size-description" tabindex="-1">
+      <div class="batch-size-heading">
+        <div>
+          <p class="eyebrow">SESSION SIZE</p>
+          <h2 id="batch-size-title">이번 학습 단어 수</h2>
+        </div>
+        <button class="batch-size-close" id="batch-size-close" type="button" aria-label="단어 수 선택 닫기">✕</button>
+      </div>
+      <p class="batch-size-description" id="batch-size-description">원하는 만큼 골라 가볍게 시작해 보세요.</p>
+      <div class="batch-size-options" id="batch-size-options" role="group" aria-label="학습 단어 수"></div>
+      <p class="batch-size-availability" id="batch-size-availability" aria-live="polite"></p>
     </section>
   </div>
   <!-- 한국어 설명: 진행 중 학습을 실수로 중단하지 않도록 이탈 확인 대화상자를 표시해요. -->

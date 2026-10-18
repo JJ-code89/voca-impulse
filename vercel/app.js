@@ -52,6 +52,11 @@ const DECK_TITLES = { all: "전체 단어장" };
 const INTERVAL_DAYS = { 1: 1, 2: 4, 3: 14 };
 // 한글 설명 주석: 퀴즈 라운드와 빈칸 문제의 응답 속도 및 정확도를 분리 집계해요.
 const STUDY_ANALYTICS_MODES = ["round1", "round2", "round3", "blank"];
+// 한글 설명 주석: 복합 명사 뜻에서 수식어만 바꿔 같은 의미상 머리명사를 유지해요.
+const KOREAN_HEAD_NOUNS = [
+  "측정치", "접근법", "분석", "방법", "모형", "양상", "체계", "이론", "과정"
+];
+const LEVEL_TEST_QUESTION_COUNT = 15;
 // 한글 설명 주석: 저장 설정과 백업 검증, 세션 분량 선택 모달이 공통으로 허용하는 단어 수예요.
 const SESSION_LENGTH_OPTIONS = [10, 15, 20, 25, 30, 50];
 // 한글 설명 주석: 화면에서 데이터를 표시하거나 갱신할 때 사용하는 HTML 요소예요.
@@ -1856,51 +1861,82 @@ function renderLevelTestIntro() {
   appContent.replaceChildren(section);
 }
 
-// 한글 설명 주석: 30일 로드맵을 세 구간으로 나누고 각 구간에서 5개씩 무작위 추출해요.
+// 한글 주석: Day 순으로 단어장을 15개 동일 비율 난이도 구간으로 나눠 Q1은 쉬운 구간, Q15는 상위 구간에서 출발해요.
 function createLevelTestQuestions() {
-  const difficultyBands = [
-    { key: "basic", label: "기초 빈출", firstDay: 1, lastDay: 10 },
-    { key: "intermediate", label: "실전 핵심", firstDay: 11, lastDay: 20 },
-    { key: "advanced", label: "상위권 완성", firstDay: 21, lastDay: 30 }
-  ];
+  if (words.length < LEVEL_TEST_QUESTION_COUNT) {
+    throw new Error("레벨 테스트를 만들려면 단어가 15개 이상 필요해요.");
+  }
 
-  // 한글 설명 주석: 각 구간을 독립적으로 섞어 다섯 문제씩 뽑아 특정 덱이나 ID 순서의 편향을 줄여요.
-  return difficultyBands.flatMap((band) => {
-    const bandWords = words.filter((word) => {
-      const dayNumber = Number(word.deck.slice(4));
-      return dayNumber >= band.firstDay && dayNumber <= band.lastDay;
-    });
-    if (bandWords.length < 5) {
-      throw new Error(`${band.label} 구간에 레벨 테스트용 단어가 다섯 개보다 적어요.`);
-    }
-
-    return shuffle(bandWords).slice(0, 5).map((word) => ({
-      word,
-      bandKey: band.key,
-      difficultyLabel: band.label,
-      choices: createLevelTestChoices(word)
-    }));
-  });
+  const difficultyCatalog = shuffle(words).sort((first, second) =>
+    Number(first.deck.slice(4)) - Number(second.deck.slice(4))
+  );
+  const bands = Array.from({ length: LEVEL_TEST_QUESTION_COUNT }, (_, index) => ({
+    questionNumber: index + 1,
+    startIndex: Math.floor(index * difficultyCatalog.length / LEVEL_TEST_QUESTION_COUNT),
+    endIndex: Math.floor((index + 1) * difficultyCatalog.length / LEVEL_TEST_QUESTION_COUNT)
+  }));
+  return { difficultyCatalog, bands };
 }
 
-// 한글 설명 주석: 진단 보기에도 같은 품사와 가까운 Day의 뜻을 써 선택지만 보고 정답을 짐작하기 어렵게 해요.
+// 한글 설명 주석: 진단 보기에도 일반 퀴즈와 동일한 품사/머리명사/형식 잠금 규칙을 적용해요.
 function createLevelTestChoices(targetWord) {
   return buildQuizOptions(targetWord, (candidate) => candidate.meaning);
 }
 
-// 한글 설명 주석: 난이도별 다섯 문항을 준비하고 정답 공개 없이 첫 문제부터 순서대로 보여줘요.
+// 한글 주석: 문항 k의 밴드 중앙에 누적 적응 오프셋을 더하고, 정답 +3%/오답 -2%만큼 다음 난도를 옮겨요.
+function selectNextLevelTestQuestion(state) {
+  const band = state.difficultyBands[state.currentIndex];
+  if (!band) {
+    state.currentQuestion = null;
+    return;
+  }
+
+  const baseIndex = (band.startIndex + band.endIndex - 1) / 2;
+  const targetIndex = Math.max(
+    0,
+    Math.min(state.difficultyCatalog.length - 1, Math.round(baseIndex + state.adaptiveOffset))
+  );
+  const availableWords = state.difficultyCatalog
+    .map((word, index) => ({ word, index }))
+    .filter(({ word }) => !state.askedWordIds.has(word.id));
+  if (availableWords.length === 0) {
+    throw new Error("레벨 테스트에 사용할 새 단어를 찾지 못했어요.");
+  }
+
+  const minDistance = Math.min(...availableWords.map(({ index }) => Math.abs(index - targetIndex)));
+  const randomTieWindow = Math.max(1, Math.floor(state.difficultyCatalog.length * 0.003));
+  const nearestWords = availableWords.filter(({ index }) =>
+    Math.abs(index - targetIndex) <= minDistance + randomTieWindow
+  );
+  const selected = shuffle(nearestWords)[0];
+  state.askedWordIds.add(selected.word.id);
+  state.currentQuestion = {
+    word: selected.word,
+    difficultyIndex: selected.index,
+    choices: createLevelTestChoices(selected.word)
+  };
+}
+
+// 한글 설명 주석: 15개 난이도 구간과 적응형 목표 난도를 준비해 첫 문항부터 순서대로 보여줘요.
 function startLevelTest() {
   // 한글 설명 주석: 실제 문항 풀이가 시작되는 순간부터 덱/프로필 전환 시 세션 이탈을 확인해요.
   activeStudySession = true;
   setStudyControlsLocked(true);
   try {
+    const { difficultyCatalog, bands } = createLevelTestQuestions();
     levelTestState = {
-      questions: createLevelTestQuestions(),
+      difficultyCatalog,
+      difficultyBands: bands,
       currentIndex: 0,
       correctCount: 0,
       correctWordIds: new Set(),
-      correctByBand: { basic: 0, intermediate: 0, advanced: 0 }
+      askedWordIds: new Set(),
+      adaptiveOffset: 0,
+      weightedScore: 0,
+      highestDifficultyCleared: -1,
+      currentQuestion: null
     };
+    selectNextLevelTestQuestion(levelTestState);
     renderLevelTestQuestion();
   } catch (error) {
     activeStudySession = false;
@@ -1915,18 +1951,21 @@ function renderLevelTestQuestion() {
   if (!state) {
     return;
   }
-  if (state.currentIndex >= state.questions.length) {
+  if (state.currentIndex >= state.difficultyBands.length) {
     renderLevelTestResult();
     return;
   }
 
-  const question = state.questions[state.currentIndex];
+  const question = state.currentQuestion;
+  if (!question) {
+    throw new Error("레벨 테스트 문항을 준비하지 못했어요.");
+  }
   const section = createElement("section", "panel-content");
-  section.append(createProgressHeader("어휘 레벨 테스트", state.currentIndex + 1, state.questions.length));
+  section.append(createProgressHeader("어휘 레벨 테스트", state.currentIndex + 1, state.difficultyBands.length));
 
   const card = createElement("article", "level-test-card");
   card.append(
-    createElement("p", "question-kicker", question.difficultyLabel),
+    createElement("p", "question-kicker", `난이도 구간 ${state.currentIndex + 1} / ${LEVEL_TEST_QUESTION_COUNT}`),
     createElement("h2", "level-test-word", question.word.word),
     createElement("p", "level-test-prompt", "학술 문맥에서 굵게 표시된 단어의 의미를 답해 주세요.")
   );
@@ -1962,18 +2001,30 @@ function renderLevelTestQuestion() {
 // 한글 설명 주석: 사용자가 뜻을 고르면 점수만 기록하고 즉시 다음 문제로 이동해 정오답을 노출하지 않아요.
 function submitLevelTestAnswer(selectedMeaning) {
   const state = levelTestState;
-  if (!state || state.currentIndex >= state.questions.length) {
+  if (!state || state.currentIndex >= state.difficultyBands.length) {
     return;
   }
 
-  const question = state.questions[state.currentIndex];
-  if (String(selectedMeaning).trim().toLocaleLowerCase() === question.word.meaning.trim().toLocaleLowerCase()) {
+  const question = state.currentQuestion;
+  if (!question) {
+    throw new Error("현재 레벨 테스트 문항이 없어요.");
+  }
+  const isCorrect = String(selectedMeaning).trim().toLocaleLowerCase() === question.word.meaning.trim().toLocaleLowerCase();
+  if (isCorrect) {
     state.correctCount += 1;
+    // 한글 주석: 문항 번호 k를 맞히면 가중 점수에 k점을 더해 쉬운 문항보다 어려운 정답을 높게 평가해요.
+    state.weightedScore += state.currentIndex + 1;
     state.correctWordIds.add(question.word.id);
-    state.correctByBand[question.bandKey] += 1;
+    state.highestDifficultyCleared = Math.max(state.highestDifficultyCleared, question.difficultyIndex);
   }
 
   state.currentIndex += 1;
+  if (state.currentIndex < state.difficultyBands.length) {
+    // 한글 주석: 정답은 전체 단어장의 3%, 오답은 2%만큼 난도를 조절해 다음 목표 구간에 누적 반영해요.
+    const catalogSize = state.difficultyCatalog.length;
+    state.adaptiveOffset += isCorrect ? catalogSize * 0.03 : -(catalogSize * 0.02);
+    selectNextLevelTestQuestion(state);
+  }
   renderLevelTestQuestion();
 }
 
@@ -1987,18 +2038,19 @@ function renderLevelTestResult() {
   // 한글 설명 주석: 정식 결과 화면에 도달하면 테스트가 끝난 상태이므로 이탈 경고를 해제해요.
   activeStudySession = false;
   setStudyControlsLocked(false);
-  const score = state.correctCount;
-  const placement = score >= 11 && state.correctByBand.advanced >= 3
+  const score = state.weightedScore;
+  const highestClearedIndex = state.highestDifficultyCleared;
+  const placement = score >= 84 && highestClearedIndex >= Math.floor(state.difficultyCatalog.length * 0.8)
     ? {
       title: "고급 (Advanced)",
-      description: "상위 난도 예문에서도 안정적인 어휘력을 보였어요. Day 21부터 변별력 어휘를 다져보세요!",
+      description: "높은 가중 점수와 상위 20% 난도 정답을 확인했어요. Day 21부터 변별력 어휘를 다져보세요!",
       deck: "Day 21",
       buttonLabel: "Day 21로 바로 이동하기"
     }
-    : score >= 7 && state.correctByBand.intermediate >= 3
+    : score >= 54 && highestClearedIndex >= Math.floor(state.difficultyCatalog.length * 0.5)
       ? {
         title: "중급 (Intermediate)",
-        description: "중간 난도 어휘를 잘 파악했어요. Day 11부터 실전 빈출 어휘를 공부해 보세요!",
+        description: "가중 점수와 중간 난도 정답을 확인했어요. Day 11부터 실전 빈출 어휘를 공부해 보세요!",
         deck: "Day 11",
         buttonLabel: "Day 11로 바로 이동하기"
       }
@@ -2022,14 +2074,18 @@ function renderLevelTestResult() {
   saveProgress();
   renderDashboard();
 
-  const percentage = Math.round((score / state.questions.length) * 100);
+  const percentage = Math.round((score / 120) * 100);
+  const highestClearedPercent = highestClearedIndex < 0
+    ? 0
+    : Math.round((highestClearedIndex / Math.max(1, state.difficultyCatalog.length - 1)) * 100);
   const section = createElement("section", "panel-content");
   const card = createElement("div", "level-test-card");
   card.append(
     createElement("div", "welcome-icon", "🏁"),
     createElement("h2", "", "레벨 진단 결과"),
-    createElement("p", "level-test-word", `${score} / ${state.questions.length}`),
+    createElement("p", "level-test-word", `${score} / 120 가중 점수 · ${state.correctCount} / ${LEVEL_TEST_QUESTION_COUNT} 정답`),
     createElement("span", "level-test-level", `${placement.title} · ${percentage}%`),
+    createElement("p", "", `정답으로 통과한 최고 난도: ${highestClearedPercent}% 구간`),
     createElement("p", "", placement.description),
     createElement("p", "", `정답으로 확인된 단어 ${state.correctWordIds.size}개를 내일 복습할 목록에 반영했어요.`)
   );

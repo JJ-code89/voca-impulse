@@ -397,6 +397,29 @@
             </div>
           </section>
 
+          <!-- 한국어 설명: 라운드별 응답 속도와 머뭇거린 어휘, 단계별 정확도를 한곳에서 비교해요. -->
+          <section class="choke-points-card" aria-labelledby="choke-points-title">
+            <header class="choke-points-heading">
+              <div>
+                <p class="eyebrow">STUDY BEHAVIOR ANALYTICS</p>
+                <h3 id="choke-points-title">어휘 취약 지점 분석 (Choke Points)</h3>
+                <p>4초 이상 고민한 정답도 취약 단어로 기록합니다.</p>
+              </div>
+            </header>
+            <h4 class="choke-point-subheading">모드별 평균 응답 시간</h4>
+            <div class="choke-point-averages" id="choke-point-averages" aria-label="모드별 평균 응답 시간"></div>
+            <div class="choke-point-details">
+              <section class="choke-point-detail" aria-labelledby="choke-hesitations-title">
+                <h4 id="choke-hesitations-title">오래 고민한 단어 Top 5</h4>
+                <ol class="choke-point-list" id="choke-point-hesitations"></ol>
+              </section>
+              <section class="choke-point-detail" aria-labelledby="choke-accuracy-title">
+                <h4 id="choke-accuracy-title">학습 단계별 정확도</h4>
+                <ul class="choke-point-list" id="choke-point-accuracy"></ul>
+              </section>
+            </div>
+          </section>
+
           <!-- 한국어 설명: Day 카드를 선택하면 덱을 저장하고 이 분석 창을 닫은 뒤 학습 화면으로 돌아가요. -->
           <section class="roadmap-section" aria-labelledby="roadmap-title">
             <div class="roadmap-heading">

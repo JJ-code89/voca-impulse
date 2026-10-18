@@ -50,6 +50,8 @@ const DECK_VALUES = ["all"];
 const DECK_TITLES = { all: "전체 단어장" };
 // 한글 설명 주석: 상태 1, 2, 3에서 정답을 맞힌 뒤 적용할 복습 간격(일)이에요.
 const INTERVAL_DAYS = { 1: 1, 2: 4, 3: 14 };
+// 한글 설명 주석: 퀴즈 라운드와 빈칸 문제의 응답 속도 및 정확도를 분리 집계해요.
+const STUDY_ANALYTICS_MODES = ["round1", "round2", "round3", "blank"];
 // 한글 설명 주석: 저장 설정과 백업 검증, 세션 분량 선택 모달이 공통으로 허용하는 단어 수예요.
 const SESSION_LENGTH_OPTIONS = [10, 15, 20, 25, 30, 50];
 // 한글 설명 주석: 화면에서 데이터를 표시하거나 갱신할 때 사용하는 HTML 요소예요.
@@ -179,7 +181,8 @@ let history = {
   mistakeDate: getLocalDateKey(),
   todayMistakes: [],
   sessionDate: getLocalDateKey(),
-  todaySessionWords: []
+  todaySessionWords: [],
+  studyAnalytics: createEmptyStudyAnalytics()
 };
 // 한글 설명 주석: currentSession은 이번 세션에서 플래시카드와 퀴즈에 사용할 단어들이에요.
 let currentSession = [];
@@ -214,6 +217,8 @@ let correctAnswers = 0;
 let answerSubmitted = false;
 // 한글 설명 주석: 다음 버튼이 단계를 넘길지, 현재 단어를 마칠지 결정할 마지막 채점 결과예요.
 let lastAnswerWasCorrect = false;
+// 한글 설명 주석: 현재 문항이 화면에 표시된 시각부터 응답까지의 체류 시간을 계산해요.
+let questionRenderTime = null;
 // 한글 설명 주석: 새 발음을 시작할 때 이전 발음 버튼의 상태를 복구하는 데 사용해요.
 let activeSpeechButton = null;
 // 한글 설명 주석: 레벨 테스트 문항, 진행 위치와 정답으로 확인된 단어 ID를 임시로 관리해요.
@@ -492,8 +497,62 @@ function createEmptyHistory() {
     mistakeDate: getLocalDateKey(),
     todayMistakes: [],
     sessionDate: getLocalDateKey(),
-    todaySessionWords: []
+    todaySessionWords: [],
+    studyAnalytics: createEmptyStudyAnalytics()
   };
+}
+
+// 한글 설명 주석: 라운드/빈칸별 누적 응답 시간과 단어별 최장 머뭇거림을 보관해요.
+function createEmptyStudyAnalytics() {
+  return {
+    modes: Object.fromEntries(STUDY_ANALYTICS_MODES.map((mode) => [
+      mode,
+      { count: 0, totalTimeMs: 0, correctCount: 0 }
+    ])),
+    words: {}
+  };
+}
+
+// 한글 설명 주석: 이전 버전 기록도 안전하게 읽도록 분석 통계를 숫자와 허용된 모드만 복원해요.
+function normalizeStudyAnalytics(savedAnalytics) {
+  const analytics = createEmptyStudyAnalytics();
+  if (!savedAnalytics || typeof savedAnalytics !== "object") {
+    return analytics;
+  }
+
+  STUDY_ANALYTICS_MODES.forEach((mode) => {
+    const savedMode = savedAnalytics.modes?.[mode];
+    if (!savedMode || typeof savedMode !== "object") {
+      return;
+    }
+    const count = Number.isSafeInteger(savedMode.count) && savedMode.count >= 0 ? savedMode.count : 0;
+    analytics.modes[mode] = {
+      count,
+      totalTimeMs: Number.isFinite(savedMode.totalTimeMs) && savedMode.totalTimeMs >= 0
+        ? savedMode.totalTimeMs
+        : 0,
+      correctCount: Number.isSafeInteger(savedMode.correctCount) && savedMode.correctCount >= 0
+        ? Math.min(savedMode.correctCount, count)
+        : 0
+    };
+  });
+
+  if (savedAnalytics.words && typeof savedAnalytics.words === "object" && !Array.isArray(savedAnalytics.words)) {
+    Object.entries(savedAnalytics.words).forEach(([wordId, savedWord]) => {
+      if (!savedWord || typeof savedWord !== "object") {
+        return;
+      }
+      analytics.words[wordId] = {
+        maxTimeMs: Number.isFinite(savedWord.maxTimeMs) && savedWord.maxTimeMs >= 0
+          ? savedWord.maxTimeMs
+          : 0,
+        hesitationCount: Number.isSafeInteger(savedWord.hesitationCount) && savedWord.hesitationCount >= 0
+          ? savedWord.hesitationCount
+          : 0
+      };
+    });
+  }
+  return analytics;
 }
 
 // 한글 설명 주석: 현재 학습을 계속한 채 프로필 선택 창을 닫는 전환 취소 동작이에요.
@@ -592,7 +651,8 @@ function loadProgress() {
     sessionDate: canRestoreWordProgress && parsedProgress.sessionDate === getLocalDateKey() ? parsedProgress.sessionDate : getLocalDateKey(),
     todaySessionWords: canRestoreWordProgress && parsedProgress.sessionDate === getLocalDateKey() && Array.isArray(parsedProgress.todaySessionWords)
       ? [...new Set(parsedProgress.todaySessionWords.filter((id) => Number.isInteger(id)))]
-      : []
+      : [],
+    studyAnalytics: normalizeStudyAnalytics(canRestoreWordProgress ? parsedProgress.studyAnalytics : null)
   };
 
   // 한글 설명 주석: 현재 또는 검증된 500개 이전 버전의 진도만 기존 ID에 적용해 잘못된 상태 재사용을 막아요.
@@ -642,6 +702,7 @@ function createProgressSnapshot() {
     todayMistakes: history.todayMistakes,
     sessionDate: history.sessionDate,
     todaySessionWords: history.todaySessionWords,
+    studyAnalytics: history.studyAnalytics,
     currentDeck
   };
 }
@@ -881,6 +942,105 @@ function renderDashboard() {
   reviewTodayWordsButton.disabled = todayWordsCount === 0 || studyControlsLocked;
   reviewMasteredDeckButton.disabled = !allDeckWordsMastered || studyControlsLocked;
   installGuideReopenButton.hidden = isStandaloneApp() || !installGuideDismissed;
+  renderAnalytics();
+}
+
+// 한글 설명 주석: 모드별 평균 체류 시간, 4초 이상 머뭇거린 단어와 단계별 정확도를 분석 카드에 표시해요.
+function renderAnalytics() {
+  const analytics = normalizeStudyAnalytics(history.studyAnalytics);
+  const averageContainer = document.querySelector("#choke-point-averages");
+  const hesitationContainer = document.querySelector("#choke-point-hesitations");
+  const accuracyContainer = document.querySelector("#choke-point-accuracy");
+  if (!averageContainer || !hesitationContainer || !accuracyContainer) {
+    return;
+  }
+
+  const modeLabels = {
+    round1: "Round 1",
+    round2: "Round 2",
+    round3: "Round 3",
+    blank: "빈칸 쓰기"
+  };
+  averageContainer.replaceChildren();
+  STUDY_ANALYTICS_MODES.forEach((mode) => {
+    const stats = analytics.modes[mode];
+    const metric = createElement("div", "choke-point-metric");
+    metric.append(
+      createElement("span", "", modeLabels[mode]),
+      createElement("strong", "", stats.count === 0
+        ? "기록 없음"
+        : `${(stats.totalTimeMs / stats.count / 1000).toFixed(1)}초`)
+    );
+    averageContainer.append(metric);
+  });
+
+  hesitationContainer.replaceChildren();
+  const topHesitations = Object.entries(analytics.words)
+    .filter(([, stats]) => stats.maxTimeMs >= 4000)
+    .map(([wordId, stats]) => ({
+      word: words.find((candidate) => String(candidate.id) === wordId),
+      ...stats
+    }))
+    .filter((entry) => entry.word)
+    .sort((first, second) => second.maxTimeMs - first.maxTimeMs)
+    .slice(0, 5);
+  if (topHesitations.length === 0) {
+    hesitationContainer.append(createElement("li", "choke-point-empty", "아직 4초 이상 머뭇거린 단어가 없어요."));
+  } else {
+    topHesitations.forEach(({ word, maxTimeMs, hesitationCount }) => {
+      const item = createElement("li", "choke-point-list-item");
+      const copy = createElement("span", "choke-point-word-copy");
+      copy.append(
+        createElement("strong", "", word.word),
+        createElement("small", "", word.meaning)
+      );
+      item.append(
+        copy,
+        createElement("span", "choke-point-flag", `취약 단어 · ${(maxTimeMs / 1000).toFixed(1)}초${hesitationCount > 1 ? ` · ${hesitationCount}회` : ""}`)
+      );
+      hesitationContainer.append(item);
+    });
+  }
+
+  accuracyContainer.replaceChildren();
+  STUDY_ANALYTICS_MODES.forEach((mode) => {
+    const stats = analytics.modes[mode];
+    const accuracy = stats.count === 0 ? null : Math.round((stats.correctCount / stats.count) * 100);
+    const item = createElement("li", "choke-point-list-item");
+    item.append(
+      createElement("span", "", modeLabels[mode]),
+      createElement("strong", "", accuracy === null ? "기록 없음" : `${accuracy}% (${stats.correctCount}/${stats.count})`)
+    );
+    accuracyContainer.append(item);
+  });
+}
+
+// 한글 주석: 문항이 표시된 시각부터 답을 제출한 시각까지의 밀리초를 누적하고 4초 이상이면 취약 단어로 기록해요.
+function recordStudyAnswer(word, mode, isCorrect) {
+  if (!STUDY_ANALYTICS_MODES.includes(mode) || questionRenderTime === null) {
+    throw new Error("문항 응답 분석 정보를 확인할 수 없어요.");
+  }
+
+  // 한글 주석: 응답 체류 시간은 Date.now()에서 문항 렌더 시각을 뺀 밀리초로 계산해요.
+  const elapsedMs = Math.max(0, Date.now() - questionRenderTime);
+  questionRenderTime = null;
+  const analytics = normalizeStudyAnalytics(history.studyAnalytics);
+  const modeStats = analytics.modes[mode];
+  modeStats.count += 1;
+  modeStats.totalTimeMs += elapsedMs;
+  if (isCorrect) {
+    modeStats.correctCount += 1;
+  }
+
+  const wordKey = String(word.id);
+  const wordStats = analytics.words[wordKey] || { maxTimeMs: 0, hesitationCount: 0 };
+  wordStats.maxTimeMs = Math.max(wordStats.maxTimeMs, elapsedMs);
+  if (elapsedMs >= 4000) {
+    wordStats.hesitationCount += 1;
+  }
+  analytics.words[wordKey] = wordStats;
+  history.studyAnalytics = analytics;
+  return { elapsedMs, hesitated: elapsedMs >= 4000 };
 }
 
 // 한글 설명 주석: 세션 중에는 새 학습 동작만 잠그고 덱 버튼은 이탈 확인을 거쳐 전환할 수 있게 열어 둬요.
@@ -1681,7 +1841,7 @@ function renderLevelTestIntro() {
     createElement("div", "welcome-icon", "🎯"),
     createElement("h2", "", "어휘 레벨 테스트"),
     createElement("p", "", "총 15문항으로 나의 토플 어휘 레벨을 3분 만에 진단합니다."),
-    createElement("p", "", "기초부터 고급까지 단어의 한국어 뜻을 골라 주세요. 테스트 중에는 정답 여부를 표시하지 않아요.")
+    createElement("p", "", "기초부터 고급까지 학술 예문 속 단어의 의미를 선택하거나 입력해 주세요. 테스트 중에는 정답 여부를 표시하지 않아요.")
   );
 
   const actions = createElement("div", "stage-actions");
@@ -1699,9 +1859,9 @@ function renderLevelTestIntro() {
 // 한글 설명 주석: 30일 로드맵을 세 구간으로 나누고 각 구간에서 5개씩 무작위 추출해요.
 function createLevelTestQuestions() {
   const difficultyBands = [
-    { label: "기초 빈출", firstDay: 1, lastDay: 10 },
-    { label: "실전 핵심", firstDay: 11, lastDay: 20 },
-    { label: "상위권 완성", firstDay: 21, lastDay: 30 }
+    { key: "basic", label: "기초 빈출", firstDay: 1, lastDay: 10 },
+    { key: "intermediate", label: "실전 핵심", firstDay: 11, lastDay: 20 },
+    { key: "advanced", label: "상위권 완성", firstDay: 21, lastDay: 30 }
   ];
 
   // 한글 설명 주석: 각 구간을 독립적으로 섞어 다섯 문제씩 뽑아 특정 덱이나 ID 순서의 편향을 줄여요.
@@ -1716,26 +1876,16 @@ function createLevelTestQuestions() {
 
     return shuffle(bandWords).slice(0, 5).map((word) => ({
       word,
+      bandKey: band.key,
       difficultyLabel: band.label,
       choices: createLevelTestChoices(word)
     }));
   });
 }
 
-// 한글 설명 주석: 정답 뜻 하나에 서로 다른 오답 뜻 세 개를 더하고 선택지 순서를 다시 섞어요.
+// 한글 설명 주석: 진단 보기에도 같은 품사와 가까운 Day의 뜻을 써 선택지만 보고 정답을 짐작하기 어렵게 해요.
 function createLevelTestChoices(targetWord) {
-  const correctMeaning = targetWord.meaning;
-  const distractorMeanings = [...new Set(
-    shuffle(words)
-      .filter((word) => word.id !== targetWord.id && word.meaning !== correctMeaning)
-      .map((word) => word.meaning)
-  )].slice(0, 3);
-
-  if (distractorMeanings.length < 3) {
-    throw new Error("레벨 테스트 선택지를 만들 만큼 서로 다른 단어 뜻이 충분하지 않아요.");
-  }
-
-  return shuffle([correctMeaning, ...distractorMeanings]);
+  return buildQuizOptions(targetWord, (candidate) => candidate.meaning);
 }
 
 // 한글 설명 주석: 난이도별 다섯 문항을 준비하고 정답 공개 없이 첫 문제부터 순서대로 보여줘요.
@@ -1748,7 +1898,8 @@ function startLevelTest() {
       questions: createLevelTestQuestions(),
       currentIndex: 0,
       correctCount: 0,
-      correctWordIds: new Set()
+      correctWordIds: new Set(),
+      correctByBand: { basic: 0, intermediate: 0, advanced: 0 }
     };
     renderLevelTestQuestion();
   } catch (error) {
@@ -1776,19 +1927,34 @@ function renderLevelTestQuestion() {
   const card = createElement("article", "level-test-card");
   card.append(
     createElement("p", "question-kicker", question.difficultyLabel),
-    createElement("p", "level-test-prompt", "이 단어의 뜻으로 가장 알맞은 것을 골라 주세요."),
-    createElement("h2", "level-test-word", question.word.word)
+    createElement("h2", "level-test-word", question.word.word),
+    createElement("p", "level-test-prompt", "학술 문맥에서 굵게 표시된 단어의 의미를 답해 주세요.")
   );
-
-  const choices = createElement("div", "level-test-choices");
-  question.choices.forEach((meaning) => {
-    const choice = createElement("button", "level-test-choice", meaning);
-    choice.type = "button";
-    choice.addEventListener("click", () => submitLevelTestAnswer(meaning));
-    choices.append(choice);
+  const context = createElement("p", "level-test-context");
+  const escapedWord = escapeRegExp(question.word.word);
+  const targetPattern = new RegExp(`\\b${escapedWord}\\b`, "ig");
+  const sentenceParts = question.word.exampleEn.split(targetPattern);
+  const matches = question.word.exampleEn.match(targetPattern) || [];
+  sentenceParts.forEach((part, index) => {
+    context.append(document.createTextNode(part));
+    if (matches[index]) {
+      context.append(createElement("strong", "level-test-context-target", matches[index]));
+    }
   });
+  card.append(context);
 
-  card.append(choices);
+  if (question.choices) {
+    const choices = createElement("div", "level-test-choices");
+    question.choices.forEach((meaning) => {
+      const choice = createElement("button", "level-test-choice", meaning);
+      choice.type = "button";
+      choice.addEventListener("click", () => submitLevelTestAnswer(meaning));
+      choices.append(choice);
+    });
+    card.append(choices);
+  } else {
+    card.append(createShortAnswerForm("뜻 입력", submitLevelTestAnswer));
+  }
   section.append(card);
   appContent.replaceChildren(section);
 }
@@ -1801,9 +1967,10 @@ function submitLevelTestAnswer(selectedMeaning) {
   }
 
   const question = state.questions[state.currentIndex];
-  if (selectedMeaning === question.word.meaning) {
+  if (String(selectedMeaning).trim().toLocaleLowerCase() === question.word.meaning.trim().toLocaleLowerCase()) {
     state.correctCount += 1;
     state.correctWordIds.add(question.word.id);
+    state.correctByBand[question.bandKey] += 1;
   }
 
   state.currentIndex += 1;
@@ -1821,25 +1988,25 @@ function renderLevelTestResult() {
   activeStudySession = false;
   setStudyControlsLocked(false);
   const score = state.correctCount;
-  const placement = score <= 9
+  const placement = score >= 11 && state.correctByBand.advanced >= 3
     ? {
-      title: "초급 (Starter)",
-      description: "Day 1부터 기초 어휘를 탄탄히 다져보세요!",
-      deck: "Day 1",
-      buttonLabel: "Day 1으로 시작하기"
+      title: "고급 (Advanced)",
+      description: "상위 난도 예문에서도 안정적인 어휘력을 보였어요. Day 21부터 변별력 어휘를 다져보세요!",
+      deck: "Day 21",
+      buttonLabel: "Day 21로 바로 이동하기"
     }
-    : score <= 12
+    : score >= 7 && state.correctByBand.intermediate >= 3
       ? {
         title: "중급 (Intermediate)",
-        description: "실전 빈출 어휘 공략을 권장합니다!",
+        description: "중간 난도 어휘를 잘 파악했어요. Day 11부터 실전 빈출 어휘를 공부해 보세요!",
         deck: "Day 11",
         buttonLabel: "Day 11로 바로 이동하기"
       }
       : {
-        title: "고급 (Advanced)",
-        description: "고득점용 변별력 어휘를 집중 학습하세요!",
-        deck: "Day 21",
-        buttonLabel: "Day 21로 바로 이동하기"
+        title: "초급 (Starter)",
+        description: "Day 1부터 기초 어휘를 탄탄히 다져보세요!",
+        deck: "Day 1",
+        buttonLabel: "Day 1으로 시작하기"
       };
 
   // 한글 설명 주석: 아직 미학습 상태인 정답 단어만 내일 복습할 상태 1로 올려 기존 학습 이력은 보존해요.
@@ -2255,6 +2422,7 @@ function renderFillBlankQuestion() {
   card.append(titleRow, maskedExample, clues, form, feedback, revealButton);
   section.append(card, actions);
   appContent.replaceChildren(section);
+  questionRenderTime = Date.now();
   window.setTimeout(() => input.focus(), 0);
 }
 
@@ -2266,12 +2434,18 @@ function submitFillBlankAnswer(word, input, submitButton, feedback, revealButton
   }
 
   const isCorrect = input.value.trim().toLocaleLowerCase() === word.word.toLocaleLowerCase();
+  const responseAnalytics = recordStudyAnswer(word, "blank", isCorrect);
+  const hesitationNote = responseAnalytics.hesitated
+    ? ` · 취약 단어 (${formatResponseTime(responseAnalytics.elapsedMs)} 응답)`
+    : "";
   if (isCorrect) {
     round.correctCount += 1;
     input.disabled = true;
     submitButton.disabled = true;
     feedback.className = "typing-feedback good";
-    feedback.textContent = "정답이에요! 아주 잘 기억했어요.";
+    feedback.textContent = `정답이에요! 아주 잘 기억했어요.${hesitationNote}`;
+    saveProgress();
+    renderDashboard();
     // 한글 설명 주석: 정답 발음은 자동 소리 설정이 켜진 경우에만 재생해요.
     if (autoSoundEnabled) {
       const pronunciationButton = appContent.querySelector(".speaker-button");
@@ -2284,8 +2458,9 @@ function submitFillBlankAnswer(word, input, submitButton, feedback, revealButton
 
   round.incorrectCount += 1;
   feedback.className = "typing-feedback bad";
-  feedback.textContent = `아쉬워요. 정답은 "${word.word}"예요. 다시 입력하거나 정답 확인 후 다음으로 넘어가세요.`;
+  feedback.textContent = `아쉬워요. 정답은 "${word.word}"예요. 다시 입력하거나 정답 확인 후 다음으로 넘어가세요.${hesitationNote}`;
   revealButton.classList.remove("hidden");
+  questionRenderTime = Date.now();
   resetMistakesForToday();
   history.todayMistakes = [...new Set([...history.todayMistakes, word.id])];
   history.activeDates = [...new Set([...history.activeDates, getLocalDateKey()])];
@@ -2898,22 +3073,31 @@ function renderQuizQuestion() {
 
   const feedback = createElement("p", "feedback");
   feedback.setAttribute("aria-live", "polite");
-  const choices = createElement("div", "choices");
   // 한글 설명 주석: 1단계는 한국어 뜻을, 2·3단계는 영어 표제어를 정답 보기로 구성해요.
   const optionBuilder = currentPhase === 1 ? buildMeaningOptions : buildWordOptions;
   const options = optionBuilder(word);
   const correctAnswer = currentPhase === 1 ? word.meaning : word.word;
-  options.forEach((option) => {
-    const choice = createElement("button", "choice", option);
-    choice.type = "button";
-    choice.addEventListener("click", () => submitAnswer(word, option, correctAnswer, feedback, choices));
-    choices.append(choice);
-  });
-  card.append(choices);
+  if (options) {
+    const choices = createElement("div", "choices");
+    options.forEach((option) => {
+      const choice = createElement("button", "choice", option);
+      choice.type = "button";
+      choice.addEventListener("click", () => submitAnswer(word, option, correctAnswer, feedback, choices));
+      choices.append(choice);
+    });
+    card.append(choices);
+  } else {
+    const answerForm = createShortAnswerForm(
+      currentPhase === 1 ? "한국어 뜻 입력" : "영어 단어 입력",
+      (answer) => submitAnswer(word, answer, correctAnswer, feedback, answerForm)
+    );
+    card.append(answerForm);
+  }
 
   card.append(feedback);
   section.append(card);
   appContent.append(section);
+  questionRenderTime = Date.now();
 
   // 한글 설명 주석: 1단계는 표제어가 처음 제시되므로 자동 발음을 재생해 기억과 소리를 연결해요.
   if (currentPhase === 1 && autoSoundEnabled && pronunciationButton) {
@@ -2955,20 +3139,52 @@ function finishQuizRound() {
   renderSummary();
 }
 
-// 한글 설명 주석: 정답 하나와 단어집에서 고른 중복 없는 오답 세 개를 섞어 4지선다를 만들어요.
+// 한글 설명 주석: 같은 품사의 후보만 남기고 가까운 Day를 먼저 뽑아 정답을 쉽게 걸러내지 못하게 해요.
 function buildQuizOptions(targetWord, valueForWord) {
   const correctAnswer = valueForWord(targetWord);
-  const distractors = [...new Set(
-    shuffle(words)
-      .filter((candidate) => candidate.id !== targetWord.id)
-      .map(valueForWord)
-      .filter((value) => value !== correctAnswer)
-  )].slice(0, 3);
+  const targetDay = Number(targetWord.deck.slice(4));
+  const distractors = [];
+  const seenValues = new Set([correctAnswer]);
+  const candidates = shuffle(words.filter((candidate) =>
+    candidate.id !== targetWord.id && candidate.partOfSpeech === targetWord.partOfSpeech
+  )).sort((first, second) => {
+    const firstDistance = Math.abs(Number(first.deck.slice(4)) - targetDay);
+    const secondDistance = Math.abs(Number(second.deck.slice(4)) - targetDay);
+    return firstDistance - secondDistance;
+  });
+  candidates.forEach((candidate) => {
+    const value = valueForWord(candidate);
+    if (!seenValues.has(value) && distractors.length < 3) {
+      seenValues.add(value);
+      distractors.push(value);
+    }
+  });
 
   if (distractors.length < 3) {
-    throw new Error("퀴즈 선택지를 만들 만큼 서로 다른 정답 후보가 부족해요.");
+    return null;
   }
   return shuffle([correctAnswer, ...distractors]);
+}
+
+// 한글 설명 주석: 동일 품사 오답 보기가 세 개 미만이면 다른 품사를 섞지 않고 직접 입력으로 답하게 해요.
+function createShortAnswerForm(placeholder, onSubmit) {
+  const form = createElement("form", "answer-row");
+  const input = createElement("input", "answer-input");
+  input.type = "text";
+  input.autocomplete = "off";
+  input.autocapitalize = "none";
+  input.spellcheck = false;
+  input.required = true;
+  input.placeholder = placeholder;
+  input.setAttribute("aria-label", placeholder);
+  const submitButton = createElement("button", "button", "답 제출");
+  submitButton.type = "submit";
+  form.append(input, submitButton);
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    onSubmit(input.value);
+  });
+  return form;
 }
 
 // 한글 설명 주석: 1단계는 영어 표제어에 해당하는 한국어 뜻 네 개를 선택지로 보여줘요.
@@ -3016,10 +3232,14 @@ function submitAnswer(word, answer, correctAnswer, feedback, answerContainer) {
   const normalizedCorrectAnswer = correctAnswer.trim().toLowerCase();
   // 한글 설명 주석: 답 문자열을 정규화하고 이번 라운드 정답과 비교해요.
   const isCorrect = normalizedAnswer === normalizedCorrectAnswer;
+  const responseAnalytics = recordStudyAnswer(word, `round${currentPhase}`, isCorrect);
+  const hesitationNote = responseAnalytics.hesitated
+    ? ` · 취약 단어 (${formatResponseTime(responseAnalytics.elapsedMs)} 응답)`
+    : "";
   lastAnswerWasCorrect = isCorrect;
 
   if (isCorrect) {
-    feedback.textContent = "정답이에요! 잠시 후 다음 문제로 넘어갈게요.";
+    feedback.textContent = `정답이에요! 잠시 후 다음 문제로 넘어갈게요.${hesitationNote}`;
     feedback.classList.add("good");
     retryWordIds.delete(word.id);
     // 한글 설명 주석: 한국어 뜻이나 유의어를 맞힌 뒤 표제어가 드러나면 자동 발음 설정을 확인해요.
@@ -3032,7 +3252,7 @@ function submitAnswer(word, answer, correctAnswer, feedback, answerContainer) {
     word.dueDate = addDays(getLocalDateKey(), 1);
     word.consecutiveCorrect = 0;
     hadMistakeWordIds.add(word.id);
-    feedback.textContent = `아쉬워요. 정답은 "${correctAnswer}"예요. 현재 라운드 끝에서 다시 풀어요.`;
+    feedback.textContent = `아쉬워요. 정답은 "${correctAnswer}"예요. 현재 라운드 끝에서 다시 풀어요.${hesitationNote}`;
     feedback.classList.add("bad");
     // 한글 설명 주석: 현재 라운드 끝에 재시험 카드를 넣어 먼저 다른 단어들을 모두 풀게 해요.
     retryWordIds.add(word.id);
@@ -3050,6 +3270,10 @@ function submitAnswer(word, answer, correctAnswer, feedback, answerContainer) {
       } else if (button.textContent === answer && !isCorrect) {
         button.classList.add("incorrect");
       }
+    });
+  } else {
+    answerContainer.querySelectorAll("button, input").forEach((control) => {
+      control.disabled = true;
     });
   }
 
